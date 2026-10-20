@@ -1,0 +1,70 @@
+{
+  "date": "2026-09-02",
+  "invoices": [
+    {
+      "containerNumber": "MSDU8534291",
+      "carrier": "Premier Logistics",
+      "invoicedAmount": 750,
+      "expectedRate": 750,
+      "status": "matched",
+      "processedAt": "2026-09-02T08:14:00Z",
+      "poNumber": "327285"
+    },
+    {
+      "containerNumber": "HLBU3927465",
+      "carrier": "West Coast Carriers",
+      "invoicedAmount": 1200,
+      "expectedRate": 1200,
+      "status": "matched",
+      "processedAt": "2026-09-02T08:31:00Z",
+      "poNumber": "321609"
+    },
+    {
+      "containerNumber": "CMAU7341892",
+      "carrier": "Valley Transport",
+      "invoicedAmount": 950,
+      "expectedRate": 950,
+      "status": "matched",
+      "processedAt": "2026-09-02T09:05:00Z",
+      "poNumber": "321610"
+    },
+    {
+      "containerNumber": "FSCU9183746",
+      "carrier": "Bay Freight Co",
+      "invoicedAmount": 800,
+      "expectedRate": 800,
+      "status": "matched",
+      "processedAt": "2026-09-02T09:47:00Z",
+      "poNumber": "321612"
+    },
+    {
+      "containerNumber": "TCNU4726518",
+      "carrier": "East Coast Express",
+      "invoicedAmount": 700,
+      "expectedRate": 700,
+      "status": "matched",
+      "processedAt": "2026-09-02T10:02:00Z",
+      "poNumber": "325663"
+    },
+    {
+      "containerNumber": "GLDU5847293",
+      "carrier": "Bay Freight Co",
+      "invoicedAmount": 900,
+      "expectedRate": 750,
+      "status": "discrepancy",
+      "discrepancyReason": "Invoiced $900, expected $750",
+      "processedAt": "2026-09-02T10:22:00Z",
+      "poNumber": "327301"
+    },
+    {
+      "containerNumber": "YMLU8234719",
+      "carrier": "Premier Logistics",
+      "invoicedAmount": 1450,
+      "expectedRate": 1200,
+      "status": "discrepancy",
+      "discrepancyReason": "Invoiced $1450, expected $1200",
+      "processedAt": "2026-09-02T11:15:00Z",
+      "poNumber": "325664"
+    }
+  ]
+}

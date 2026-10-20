@@ -1,0 +1,13 @@
+{
+  "secret": "dev-secret",
+  "date": "2026-09-02",
+  "invoice": {
+    "containerNumber": "HLBU3927465",
+    "carrier": "West Coast Carriers",
+    "invoicedAmount": 1200,
+    "expectedRate": 1200,
+    "status": "matched",
+    "processedAt": "2026-09-02T08:31:00Z",
+    "poNumber": "321609"
+  }
+}

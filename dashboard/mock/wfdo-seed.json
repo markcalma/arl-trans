@@ -1,0 +1,25 @@
+{
+  "date": "2026-10-06",
+  "orders": [
+    {
+      "id": "TEST-REDACT-001",
+      "containerNumber": "TEST-REDACT-001",
+      "masterBL": "TESTBL001",
+      "arrivalDate": "2026-10-10",
+      "consignee": "Test Consignee Inc",
+      "consigneeAddress": "123 Test St, Miami, FL 33101",
+      "cargoDescription": "General Cargo",
+      "packages": "10",
+      "weightKg": "1000",
+      "weightLb": "2205",
+      "portLocation": "Port of Miami",
+      "sealNumber": "SL12345",
+      "nvoName": "TEST NVO LLC",
+      "carrierEmail": "",
+      "carrierNotes": "",
+      "status": "pending_review",
+      "processedAt": "2026-10-06T12:00:00.000Z",
+      "packingListAttached": false
+    }
+  ]
+}

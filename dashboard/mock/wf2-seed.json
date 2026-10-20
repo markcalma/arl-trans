@@ -1,0 +1,84 @@
+{
+  "date": "2026-09-02",
+  "orders": [
+    {
+      "containerNumber": "EMCU1578644",
+      "customer": "Amercare",
+      "destination": "Exton",
+      "carrier": "Premier Logistics",
+      "rate": 750,
+      "status": "processed",
+      "processedAt": "2026-09-02T08:14:00Z",
+      "poNumber": "327285",
+      "mblNumber": "COSU1234567"
+    },
+    {
+      "containerNumber": "CAAU5879967",
+      "customer": "Amercare",
+      "destination": "Ontario",
+      "carrier": "West Coast Carriers",
+      "rate": 1200,
+      "status": "processed",
+      "processedAt": "2026-09-02T08:31:00Z",
+      "poNumber": "321609",
+      "mblNumber": "MSCU9876543"
+    },
+    {
+      "containerNumber": "GAOU7282735",
+      "customer": "OOCL",
+      "destination": "Stockton",
+      "carrier": "Valley Transport",
+      "rate": 950,
+      "status": "processed",
+      "processedAt": "2026-09-02T09:05:00Z",
+      "poNumber": "321610",
+      "mblNumber": "OOLU5432109"
+    },
+    {
+      "containerNumber": "EGSU9846470",
+      "customer": "Amercare",
+      "destination": "Oakland",
+      "carrier": "Bay Area Freight",
+      "rate": 800,
+      "status": "processed",
+      "processedAt": "2026-09-02T09:47:00Z",
+      "poNumber": "321612",
+      "mblNumber": "COSU2345678"
+    },
+    {
+      "containerNumber": "ONEU5574796",
+      "customer": "Taggart",
+      "destination": "Exton",
+      "carrier": "East Coast Express",
+      "rate": 700,
+      "status": "processed",
+      "processedAt": "2026-09-02T10:02:00Z",
+      "poNumber": "325663",
+      "mblNumber": "TGTU1122334"
+    },
+    {
+      "containerNumber": "TXGU5776680",
+      "customer": "Taggart",
+      "destination": "Portland",
+      "carrier": "",
+      "rate": 0,
+      "status": "exception",
+      "exceptionReason": "Non-standard lane — no rate found",
+      "processedAt": "2026-09-02T10:22:00Z",
+      "poNumber": "327301",
+      "mblNumber": "TGTU9988776"
+    },
+    {
+      "containerNumber": "SEKU4408000",
+      "customer": "OOCL",
+      "destination": "Reno",
+      "carrier": "",
+      "rate": 0,
+      "status": "exception",
+      "exceptionReason": "Non-standard lane — no rate found",
+      "processedAt": "2026-09-02T11:15:00Z",
+      "poNumber": "325664",
+      "mblNumber": "OOLU6677889"
+    }
+  ]
+}

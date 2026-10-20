@@ -1,0 +1,15 @@
+{
+  "secret": "dev-secret",
+  "date": "2026-09-02",
+  "order": {
+    "containerNumber": "CAAU5879967",
+    "customer": "Amercare",
+    "destination": "Ontario",
+    "carrier": "West Coast Carriers",
+    "rate": 1200,
+    "status": "processed",
+    "processedAt": "2026-09-02T08:31:00Z",
+    "poNumber": "321609",
+    "mblNumber": "MSCU9876543"
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "secret": "dev-secret",
+  "runId": "wf1-2026-09-02-0800",
+  "runAt": "2026-09-02T08:04:23Z",
+  "status": "success",
+  "summary": { "total": 378, "added": 12, "updated": 24, "skipped": 3 },
+  "perDiemAlerts": [
+    { "containerNumber": "FCIU9906716", "location": "Exton", "ssl": "COSCO", "lfd": "2026-09-03", "daysRemaining": 1 },
+    { "containerNumber": "TRHU5694330", "location": "Exton", "ssl": "EVERGREEN", "lfd": "2026-09-04", "daysRemaining": 2 },
+    { "containerNumber": "TRHU1234567", "location": "Stockton", "ssl": "EVERGREEN", "lfd": "2026-09-05", "daysRemaining": 3 },
+    { "containerNumber": "MSNU9228239", "location": "Carson", "ssl": "COSCO", "lfd": "2026-09-07", "daysRemaining": 5 }
+  ],
+  "exceptions": [
+    { "containerNumber": "EGHU8360897", "type": "reuse_load", "location": "Exton", "reason": "Duplicate container number detected" },
+    { "containerNumber": "TIIU5705770", "type": "exam_flag", "location": "NJ", "reason": "Customs exam flag — row skipped" }
+  ],
+  "containers": [
+    { "containerNumber": "EMCU1578644", "location": "Exton", "eta": "2026-09-06", "lfd": "2026-09-16", "ssl": "EVERGREEN", "po": "327285" },
+    { "containerNumber": "FCIU9906716", "location": "Exton", "eta": "2026-09-01", "lfd": "2026-09-03", "ssl": "COSCO", "po": "324299" },
+    { "containerNumber": "TRHU5694330", "location": "Exton", "eta": "2026-09-02", "lfd": "2026-09-04", "ssl": "EVERGREEN", "po": "321604" },
+    { "containerNumber": "EGHU8360897", "location": "Stockton", "eta": "2026-09-03", "lfd": "2026-09-05", "ssl": "EVERGREEN", "po": "328264" },
+    { "containerNumber": "MSNU9228239", "location": "Carson", "eta": "2026-09-04", "lfd": "2026-09-07", "ssl": "COSCO", "po": "321602" },
+    { "containerNumber": "TIIU5705770", "location": "NJ", "eta": "2026-09-05", "lfd": "2026-09-15", "ssl": "MSC", "po": "328265" },
+    { "containerNumber": "CAAU5879967", "location": "Ontario", "eta": "2026-09-08", "lfd": "2026-09-18", "ssl": "MAERSK", "po": "321609" },
+    { "containerNumber": "GAOU7282735", "location": "Stockton", "eta": "2026-09-09", "lfd": "2026-09-19", "ssl": "COSCO", "po": "321610" },
+    { "containerNumber": "TXGU5776680", "location": "Vacaville", "eta": "2026-09-10", "lfd": "2026-09-20", "ssl": "EVERGREEN", "po": "321611" },
+    { "containerNumber": "EGSU9846470", "location": "Oakland", "eta": "2026-09-11", "lfd": "2026-09-21", "ssl": "MSC", "po": "321612" },
+    { "containerNumber": "ONEU5574796", "location": "Exton", "eta": "2026-09-12", "lfd": "2026-09-22", "ssl": "OOCL", "po": "325663" },
+    { "containerNumber": "SEKU4408000", "location": "Stockton", "eta": "2026-09-13", "lfd": "2026-09-23", "ssl": "COSCO", "po": "325664" }
+  ],
+  "runLog": [
+    { "time": "08:00:01", "step": "Email detected", "status": "ok" },
+    { "time": "08:00:05", "step": "File parsed — 378 rows", "status": "ok" },
+    { "time": "08:00:12", "step": "Master Container List updated", "status": "ok" },
+    { "time": "08:00:18", "step": "Load Board updated — Exton tab", "status": "ok" },
+    { "time": "08:00:31", "step": "LFD calculated — 258 rows", "status": "ok" },
+    { "time": "08:00:33", "step": "LFD fallback used — 3 rows (blank free days)", "status": "warning" },
+    { "time": "08:00:41", "step": "Per diem alerts generated — 4 containers", "status": "ok" },
+    { "time": "08:00:44", "step": "Daily emails sent", "status": "ok" }
+  ]
+}

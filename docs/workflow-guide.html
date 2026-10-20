@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ARL-Trans — Workflow Guide</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f4f5f7;
+      color: #1a1a2e;
+      padding: 40px 20px;
+    }
+
+    .container { max-width: 860px; margin: 0 auto; }
+
+    /* HEADER */
+    .header {
+      background: #1a1a2e;
+      border-radius: 12px;
+      padding: 32px;
+      margin-bottom: 24px;
+      color: #fff;
+    }
+
+    .header .label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: #4ecdc4;
+      margin-bottom: 8px;
+    }
+
+    .header h1 { font-size: 26px; font-weight: 800; margin-bottom: 6px; }
+    .header p { font-size: 13px; color: #aaa; }
+
+    /* SUMMARY ROW */
+    .summary-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .summary-card {
+      border-radius: 10px;
+      padding: 18px 20px;
+      border-left: 5px solid;
+    }
+
+    .summary-card.wf1 { background: #f0fdfa; border-color: #14b8a6; }
+    .summary-card.wf2 { background: #fff7ed; border-color: #f97316; }
+    .summary-card.wf3 { background: #f5f3ff; border-color: #8b5cf6; }
+
+    .summary-card .wf-tag {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .wf1 .wf-tag { color: #0f766e; }
+    .wf2 .wf-tag { color: #c2410c; }
+    .wf3 .wf-tag { color: #6d28d9; }
+
+    .summary-card .one-liner {
+      font-size: 13px;
+      color: #1a1a2e;
+      font-weight: 600;
+      line-height: 1.5;
+    }
+
+    /* WORKFLOW BLOCK */
+    .wf-block {
+      background: #fff;
+      border-radius: 12px;
+      padding: 28px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+
+    .wf-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 24px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    .wf-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      flex-shrink: 0;
+    }
+
+    .wf1 .wf-icon { background: #ccfbf1; }
+    .wf2 .wf-icon { background: #fed7aa; }
+    .wf3 .wf-icon { background: #ddd6fe; }
+
+    .wf-header-text .wf-tag {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .wf1 .wf-header-text .wf-tag { color: #0f766e; }
+    .wf2 .wf-header-text .wf-tag { color: #c2410c; }
+    .wf3 .wf-header-text .wf-tag { color: #6d28d9; }
+
+    .wf-header-text h2 {
+      font-size: 20px;
+      font-weight: 800;
+      color: #1a1a2e;
+      margin-bottom: 4px;
+    }
+
+    .wf-header-text p {
+      font-size: 13px;
+      color: #666;
+      line-height: 1.5;
+    }
+
+    /* PEOPLE */
+    .sub-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: #999;
+      margin-bottom: 10px;
+    }
+
+    .people-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    .person-chip {
+      padding: 8px 14px;
+      border-radius: 8px;
+      background: #f9f9fb;
+      border: 1px solid #eee;
+    }
+
+    .person-chip .pname {
+      font-size: 13px;
+      font-weight: 700;
+      color: #1a1a2e;
+    }
+
+    .person-chip .prole {
+      font-size: 11px;
+      color: #888;
+      margin-top: 1px;
+    }
+
+    /* STEPS */
+    .steps { margin-bottom: 20px; }
+
+    .step {
+      display: flex;
+      gap: 14px;
+      margin-bottom: 10px;
+      align-items: flex-start;
+    }
+
+    .step-num {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 800;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .wf1 .step-num { background: #ccfbf1; color: #0f766e; }
+    .wf2 .step-num { background: #fed7aa; color: #c2410c; }
+    .wf3 .step-num { background: #ddd6fe; color: #6d28d9; }
+
+    .step-text {
+      font-size: 13px;
+      color: #333;
+      line-height: 1.7;
+      padding-top: 3px;
+    }
+
+    .step-text strong { color: #1a1a2e; }
+
+    /* MANUAL vs AUTO */
+    .compare-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .compare-box {
+      border-radius: 10px;
+      padding: 16px 18px;
+    }
+
+    .compare-box.manual { background: #fff5f5; border: 1px solid #fecaca; }
+    .compare-box.auto   { background: #f0fdf4; border: 1px solid #bbf7d0; }
+
+    .compare-box .box-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .compare-box.manual .box-label { color: #dc2626; }
+    .compare-box.auto   .box-label { color: #16a34a; }
+
+    .compare-box ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .compare-box ul li {
+      font-size: 12px;
+      color: #444;
+      line-height: 1.7;
+      padding-left: 14px;
+      position: relative;
+    }
+
+    .compare-box ul li::before {
+      content: '•';
+      position: absolute;
+      left: 0;
+      color: #bbb;
+    }
+
+    .compare-box.auto ul li::before { color: #16a34a; }
+    .compare-box.manual ul li::before { color: #dc2626; }
+
+    /* OUTPUT BOX */
+    .output-box {
+      border-radius: 10px;
+      padding: 16px 18px;
+      margin-bottom: 20px;
+    }
+
+    .wf1 .output-box { background: #f0fdfa; border: 1px solid #99f6e4; }
+    .wf2 .output-box { background: #fff7ed; border: 1px solid #fed7aa; }
+    .wf3 .output-box { background: #f5f3ff; border: 1px solid #ddd6fe; }
+
+    .output-box .box-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .wf1 .output-box .box-label { color: #0f766e; }
+    .wf2 .output-box .box-label { color: #c2410c; }
+    .wf3 .output-box .box-label { color: #6d28d9; }
+
+    .output-item {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 8px;
+      align-items: flex-start;
+    }
+
+    .output-item:last-child { margin-bottom: 0; }
+
+    .output-num {
+      font-size: 11px;
+      font-weight: 800;
+      width: 20px;
+      flex-shrink: 0;
+      padding-top: 2px;
+    }
+
+    .wf1 .output-num { color: #14b8a6; }
+    .wf2 .output-num { color: #f97316; }
+    .wf3 .output-num { color: #8b5cf6; }
+
+    .output-text {
+      font-size: 13px;
+      color: #333;
+      line-height: 1.6;
+    }
+
+    .output-text strong { color: #1a1a2e; }
+
+    /* TRIGGER BADGE */
+    .trigger-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+
+    .wf1 .trigger-badge { background: #ccfbf1; color: #0f766e; }
+    .wf2 .trigger-badge { background: #fed7aa; color: #c2410c; }
+    .wf3 .trigger-badge { background: #ddd6fe; color: #6d28d9; }
+
+    /* RULE BOXES */
+    .rules { display: flex; flex-direction: column; gap: 8px; }
+
+    .rule {
+      display: flex;
+      gap: 10px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      background: #f9f9fb;
+      font-size: 12px;
+      color: #444;
+      line-height: 1.6;
+    }
+
+    .rule .icon { flex-shrink: 0; }
+
+    /* DIVIDER */
+    .divider {
+      height: 1px;
+      background: #f0f0f0;
+      margin: 20px 0;
+    }
+
+    @media (max-width: 600px) {
+      .summary-row { grid-template-columns: 1fr; }
+      .compare-row { grid-template-columns: 1fr; }
+      .people-row { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="label">Build Reference</div>
+    <h1>ARL-Trans — Workflow Guide</h1>
+    <p>Who's involved, what happens, what it replaces, and what comes out — for all 3 workflows.</p>
+  </div>
+
+  <!-- SUMMARY ROW -->
+  <div class="summary-row">
+    <div class="summary-card wf1">
+      <div class="wf-tag">WF1</div>
+      <div class="one-liner">Turns Gary's weekly manual spreadsheet work into a daily automatic process so containers never miss their deadline</div>
+    </div>
+    <div class="summary-card wf2">
+      <div class="wf-tag">WF2</div>
+      <div class="one-liner">Turns Lorene's manual dispatch process into an automatic one the moment a delivery order arrives</div>
+    </div>
+    <div class="summary-card wf3">
+      <div class="wf-tag">WF3</div>
+      <div class="one-liner">Automatically matches carrier invoices to load records and flags anything that doesn't add up before AP ever sees it</div>
+    </div>
+  </div>
+
+  <!-- ===== WF1 ===== -->
+  <div class="wf-block wf1">
+
+    <div class="wf-header">
+      <div class="wf-icon">📋</div>
+      <div class="wf-header-text">
+        <div class="wf-tag">WF1 — Water Report</div>
+        <h2>Daily Container Tracking</h2>
+        <p>Replaces Gary's manual daily reconciliation of the water report, Load Board updates, and carrier emails.</p>
+      </div>
+    </div>
+
+    <div class="trigger-badge">⚡ Trigger — Water report email arrives in orders@arl-trans.com</div>
+
+    <div class="sub-label">Who is involved</div>
+    <div class="people-row">
+      <div class="person-chip">
+        <div class="pname">Amercare</div>
+        <div class="prole">Sends daily water report Excel file</div>
+      </div>
+      <div class="person-chip">
+        <div class="pname">Mikki Corvey</div>
+        <div class="prole">Sends daily work order schedule (Track 2)</div>
+      </div>
+      <div class="person-chip">
+        <div class="pname">Gary</div>
+        <div class="prole">Owns Master Container List — WF1 replaces his daily work</div>
+      </div>
+      <div class="person-chip">
+        <div class="pname">Carriers</div>
+        <div class="prole">Read the Load Board to know what to pick up</div>
+      </div>
+    </div>
+
+    <div class="sub-label">What happens step by step</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text"><strong>Amercare sends the water report</strong> — a daily Excel file listing all their active containers, where they're going, and when they arrive at port.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text"><strong>WF1 parses the file</strong> — reads every container row and extracts container number, ETA, destination, steamship line, and free days.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text"><strong>Master Container List updated</strong> — new containers added, existing containers updated with new ETAs. Exam-flagged rows are never touched.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-text"><strong>LFD scraped from port websites</strong> — Last Free Day is the deadline before the port charges $400/day. WF1 checks the terminal website to get the exact date. If the water report already has it, that value is used instead.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-text"><strong>Per diem date calculated</strong> — how many free days the steamship line allows + the unloaded date = when charges start if the container hasn't been picked up.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">6</div>
+        <div class="step-text"><strong>Load Board updated</strong> — each container is sorted into the right tab (Stockton, Exton, Carsen, etc.) so carriers can see their assigned pickups.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">7</div>
+        <div class="step-text"><strong>Two emails sent automatically</strong> — one to Amercare (container status, no pricing), one to carriers (pickup list with container numbers, ETAs, and deadlines).</div>
+      </div>
+    </div>
+
+    <div class="compare-row">
+      <div class="compare-box manual">
+        <div class="box-label">Gary does this manually today</div>
+        <ul>
+          <li>Opens water report every 2–3 weeks</li>
+          <li>Copy-pastes into spreadsheet by hand</li>
+          <li>Checks multiple port websites for LFD</li>
+          <li>Calculates per diem dates manually</li>
+          <li>Sorts containers into Load Board tabs</li>
+          <li>Writes and sends carrier emails</li>
+          <li>Writes and sends Amercare emails</li>
+        </ul>
+      </div>
+      <div class="compare-box auto">
+        <div class="box-label">WF1 does this automatically</div>
+        <ul>
+          <li>Runs every day the moment email arrives</li>
+          <li>Parses Excel and writes to Google Sheets</li>
+          <li>Scrapes port websites for LFD</li>
+          <li>Calculates per diem from free days key</li>
+          <li>Routes containers to correct tab</li>
+          <li>Generates and sends carrier email</li>
+          <li>Generates and sends Amercare email (no pricing)</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="sub-label">Final outputs</div>
+    <div class="output-box">
+      <div class="box-label">What comes out</div>
+      <div class="output-item">
+        <div class="output-num">1</div>
+        <div class="output-text"><strong>Master Container List updated</strong> — all containers current with LFD and per diem dates filled in</div>
+      </div>
+      <div class="output-item">
+        <div class="output-num">2</div>
+        <div class="output-text"><strong>Amicare Load Board updated</strong> — every tab sorted by ETA, carriers see current data</div>
+      </div>
+      <div class="output-item">
+        <div class="output-num">3</div>
+        <div class="output-text"><strong>Email to Amercare</strong> — container status update, no carrier pricing</div>
+      </div>
+      <div class="output-item">
+        <div class="output-num">4</div>
+        <div class="output-text"><strong>Email to carriers</strong> — pickup list in Gary's format (container number, ETA, pickup date, termination date)</div>
+      </div>
+    </div>
+
+    <div class="sub-label">Important rules</div>
+    <div class="rules">
+      <div class="rule"><span class="icon">🚫</span> Never overwrite exam-flagged rows — Gary marks these manually when customs puts a container on hold</div>
+      <div class="rule"><span class="icon">🔁</span> Duplicate container numbers are valid — same container used twice (reuse load) must be flagged, not deleted</div>
+      <div class="rule"><span class="icon">💰</span> Carrier pricing must never appear in the Amercare email — two completely separate emails, always</div>
+      <div class="rule"><span class="icon">📊</span> Column D blank = use Column P + port rules as fallback for free days calculation</div>
+    </div>
+
+  </div>
+
+  <!-- ===== WF2 ===== -->
+  <div class="wf-block wf2">
+
+    <div class="wf-header">
+      <div class="wf-icon">📦</div>
+      <div class="wf-header-text">
+        <div class="wf-tag">WF2 — Order Intake</div>
+        <h2>Delivery Order Processing & Dispatch</h2>
+        <p>Replaces Lorene's manual process of reading delivery orders, creating Truckman loads, and dispatching carriers.</p>
+      </div>
+    </div>
+
+    <div class="trigger-badge">⚡ Trigger — Delivery order email arrives in orders@arl-trans.com</div>
+
+    <div class="sub-label">Who is involved</div>
+    <div class="people-row">
+      <div class="person-chip">
+        <div class="pname">Amercare / Taggart / OOCL</div>
+        <div class="prole">Send the delivery order by email</div>
+      </div>
+      <div class="person-chip">
+        <div class="pname">ARL-Trans (Lorene)</div>
+        <div class="prole">Receives DO and arranges trucking — WF2 replaces her</div>
+      </div>
+      <div class="person-chip">
+        <div class="pname">Carrier</div>
+        <div class="prole">Gets hired and dispatched to pick up the container</div>
+      </div>
+    </div>
+
+    <div class="sub-label">What happens step by step</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text"><strong>Delivery order arrives by email</strong> — sent by Amercare, Taggart International, or OOCL. It means "this container is at the port, go pick it up and deliver it here."</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text"><strong>WF2 reads the email and any attachments</strong> — parses the email body for container number, MBL, customer ref, and destination. If there's a PDF, AI extracts the same fields from it. Both are merged.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text"><strong>Dedup check</strong> — is this container already in the Master Container List from the water report? If yes, skip writing it. If no, add it now. (This is what Gary was doing manually when he said "I don't see this one.")</div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-text"><strong>Truckman load record created</strong> — WF2 creates the load in Truckman (ARL-Trans' TMS) with the container number, destination, and customer details already filled in.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-text"><strong>Carrier rate looked up automatically</strong> — WF2 checks the rate sheet to find what ARL-Trans agreed to pay the carrier for this route. No manual typing. This is where Lorene's billing errors happen today.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">6</div>
+        <div class="step-text"><strong>Carrier assigned and dispatched</strong> — WF2 finds the correct carrier using their MC number, then sends them two things at once: the rate confirmation (how much they'll be paid) and the dispatch (container details, pickup location, delivery address).</div>
+      </div>
+    </div>
+
+    <div class="compare-row">
+      <div class="compare-box manual">
+        <div class="box-label">Lorene does this manually today</div>
+        <ul>
+          <li>Reads every DO email</li>
+          <li>Opens Truckman and creates load by hand</li>
+          <li>Looks up carrier rate on a spreadsheet</li>
+          <li>Types rate into Truckman manually</li>
+          <li>Sends rate confirmation to carrier</li>
+          <li>Sends separate dispatch to carrier</li>
+          <li>Wrong rate entries = billing errors</li>
+        </ul>
+      </div>
+      <div class="compare-box auto">
+        <div class="box-label">WF2 does this automatically</div>
+        <ul>
+          <li>Detects DO email the moment it arrives</li>
+          <li>AI reads email body and PDF attachments</li>
+          <li>Creates Truckman load automatically</li>
+          <li>Pulls rate from rate sheet — no typing</li>
+          <li>Sends rate confirmation + dispatch together</li>
+          <li>Flags non-standard lanes for human review</li>
+          <li>Zero manual rate entry = zero rate errors</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="sub-label">Final outputs</div>
+    <div class="output-box">
+      <div class="box-label">What comes out per delivery order</div>
+      <div class="output-item">
+        <div class="output-num">1</div>
+        <div class="output-text"><strong>Master Container List updated</strong> — container added if it wasn't already there from WF1</div>
+      </div>
+      <div class="output-item">
+        <div class="output-num">2</div>
+        <div class="output-text"><strong>Truckman load record created</strong> — with correct container, destination, customer, and carrier rate</div>
+      </div>
+      <div class="output-item">
+        <div class="output-num">3</div>
+        <div class="output-text"><strong>Carrier dispatched</strong> — one email with both the rate confirmation and dispatch instructions sent automatically</div>
+      </div>
+    </div>
+
+    <div class="sub-label">Important rules</div>
+    <div class="rules">
+      <div class="rule"><span class="icon">📄</span> DO emails come from multiple senders — Amercare (weareacr.com), Taggart (taggart-intl.com), OOCL. WF2 must catch all of them</div>
+      <div class="rule"><span class="icon">🤖</span> PDF formats vary — Taggart DO, OOCL customs DO, packing list. AI parser must handle all formats</div>
+      <div class="rule"><span class="icon">⚠️</span> Non-standard lane = human exception. If no rate found in the rate sheet, flag to the ops team and stop</div>
+      <div class="rule"><span class="icon">🔗</span> Truckman integration path is TBD — API, browser automation (Playwright), or hybrid. Confirmed after Greg provides dev docs</div>
+    </div>
+
+  </div>
+
+  <!-- ===== WF3 ===== -->
+  <div class="wf-block wf3">
+
+    <div class="wf-header">
+      <div class="wf-icon">🧾</div>
+      <div class="wf-header-text">
+        <div class="wf-tag">WF3 — Carrier Invoice Portal</div>
+        <h2>Invoice Matching & Load Close-Out</h2>
+        <p>Automates the matching of carrier invoices to Truckman load records and flags discrepancies before the AP team sees them.</p>
+      </div>
+    </div>
+
+    <div class="trigger-badge">⚡ Trigger — Carrier invoice email arrives in AP inbox</div>
+
+    <div class="sub-label">Who is involved</div>
+    <div class="people-row">
+      <div class="person-chip">
+        <div class="pname">Carrier</div>
+        <div class="prole">Emails invoice after delivery to get paid</div>
+      </div>
+      <div class="person-chip">
+        <div class="pname">ARL-Trans AP Team</div>
+        <div class="prole">Processes payments — WF3 only sends them clean invoices</div>
+      </div>
+      <div class="person-chip">
+        <div class="pname">Truckman</div>
+        <div class="prole">Contains every load record with the agreed rate</div>
+      </div>
+    </div>
+
+    <div class="sub-label">What happens step by step</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text"><strong>Carrier delivers the container</strong> — job done. Now they want to get paid. They email their invoice to ARL-Trans.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text"><strong>AI classifies the document</strong> — not every email attachment is an invoice. It could be a POD (proof of delivery), a TIR ticket, or something else. AI reads it and identifies exactly what it is before doing anything.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text"><strong>Container number extracted</strong> — AI pulls the container number from the invoice. This is the key used to find the matching load in Truckman and the Master Container List.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-text"><strong>Rate check</strong> — WF3 compares the invoiced amount against the agreed rate in the rate sheet. Does the carrier charge match what was agreed when WF2 dispatched them?</div>
+      </div>
+      <div class="step">
+        <div class="step-num">5A</div>
+        <div class="step-text"><strong>If rate matches</strong> — invoice attached to Truckman load record, load flagged for close-out, Master Container List Col X updated to "Invoiced", AP team notified it's ready to pay.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">5B</div>
+        <div class="step-text"><strong>If rate doesn't match</strong> — AP team gets a discrepancy alert showing expected vs actual amount. Carrier gets an email explaining the mismatch. A human resolves it before any payment is made.</div>
+      </div>
+    </div>
+
+    <div class="compare-row">
+      <div class="compare-box manual">
+        <div class="box-label">AP team does this manually today</div>
+        <ul>
+          <li>Opens every invoice email one by one</li>
+          <li>Reads container number from invoice</li>
+          <li>Searches Truckman for matching load</li>
+          <li>Checks rate against rate sheet manually</li>
+          <li>Closes load if rate matches</li>
+          <li>Emails carrier to dispute if it doesn't</li>
+          <li>Invoices pile up and loads stay open</li>
+        </ul>
+      </div>
+      <div class="compare-box auto">
+        <div class="box-label">WF3 does this automatically</div>
+        <ul>
+          <li>Monitors inbox continuously</li>
+          <li>AI classifies every attachment</li>
+          <li>Extracts container number automatically</li>
+          <li>Checks rate against rate sheet</li>
+          <li>Closes clean loads without human input</li>
+          <li>Flags only the problem invoices</li>
+          <li>AP team only touches what needs attention</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="sub-label">Final outputs</div>
+    <div class="output-box">
+      <div class="box-label">What comes out per invoice</div>
+      <div class="output-item">
+        <div class="output-num">✓</div>
+        <div class="output-text"><strong>Rate matches →</strong> Invoice attached to Truckman load + load flagged for close-out + Master List Col X = "Invoiced" + AP team notified</div>
+      </div>
+      <div class="output-item">
+        <div class="output-num">✗</div>
+        <div class="output-text"><strong>Rate doesn't match →</strong> AP team gets discrepancy alert + carrier gets email explaining the mismatch + load stays open until resolved</div>
+      </div>
+    </div>
+
+    <div class="sub-label">Important rules</div>
+    <div class="rules">
+      <div class="rule"><span class="icon">🤖</span> AI classification is required — attachments can be invoices, PODs, TIR-in, TIR-out, or other. WF3 must know the difference before acting</div>
+      <div class="rule"><span class="icon">🔗</span> WF3 cannot start until WF2 is live — it depends on clean Truckman load records that WF2 creates. No WF2 = no load records to match against</div>
+      <div class="rule"><span class="icon">📎</span> One email can have multiple attachments — WF3 loops through each one separately and handles them individually</div>
+      <div class="rule"><span class="icon">💳</span> Never auto-pay — WF3 only flags loads as ready for close-out. A human in AP always makes the final payment decision</div>
+    </div>
+
+  </div>
+
+</div>
+</body>
+</html>

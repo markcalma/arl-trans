@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ARL-Trans Dashboard — How It Works</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+      background: #f9fafb;
+      color: #111827;
+      -webkit-font-smoothing: antialiased;
+      padding: 48px 24px;
+    }
+
+    .page {
+      max-width: 720px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    .page-header {
+      margin-bottom: 40px;
+    }
+    .page-header h1 {
+      font-size: 22px;
+      font-weight: 600;
+      color: #111827;
+    }
+    .page-header p {
+      font-size: 14px;
+      color: #9ca3af;
+      margin-top: 6px;
+    }
+
+    /* Section */
+    .section {
+      background: #ffffff;
+      border-radius: 14px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
+      padding: 28px;
+      margin-bottom: 16px;
+    }
+
+    .section-label {
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: #9ca3af;
+      margin-bottom: 16px;
+    }
+
+    .section h2 {
+      font-size: 16px;
+      font-weight: 600;
+      color: #111827;
+      margin-bottom: 8px;
+    }
+
+    .section > .description {
+      font-size: 14px;
+      color: #6b7280;
+      line-height: 1.6;
+      margin-bottom: 20px;
+    }
+
+    /* Term list */
+    .term-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .term {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+    }
+
+    .term-label {
+      flex-shrink: 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+      background: #f3f4f6;
+      color: #374151;
+      border-radius: 6px;
+      padding: 3px 8px;
+      white-space: nowrap;
+      margin-top: 1px;
+    }
+
+    .term-body {
+      font-size: 13px;
+      color: #6b7280;
+      line-height: 1.55;
+    }
+
+    .term-body strong {
+      color: #111827;
+      font-weight: 500;
+    }
+
+    /* Divider */
+    hr {
+      border: none;
+      border-top: 1px solid #f3f4f6;
+      margin: 20px 0;
+    }
+
+    /* Pill examples */
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 4px 12px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .pill.red    { background: #fef2f2; color: #b91c1c; }
+    .pill.orange { background: #fff7ed; color: #c2410c; }
+    .pill.amber  { background: #fffbeb; color: #b45309; }
+    .pill.green  { background: #f0fdf4; color: #15803d; }
+    .pill.gray   { background: #f3f4f6; color: #6b7280; }
+    .pill.blue   { background: #eff6ff; color: #1d4ed8; }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .dot.green  { background: #22c55e; }
+    .dot.amber  { background: #f59e0b; }
+    .dot.red    { background: #ef4444; }
+    .dot.gray   { background: #d1d5db; }
+
+    /* Button example */
+    .btn-example {
+      display: inline-flex;
+      align-items: center;
+      font-size: 12px;
+      font-weight: 500;
+      color: #15803d;
+      background: #f0fdf4;
+      border: 1px solid #dcfce7;
+      border-radius: 999px;
+      padding: 4px 12px;
+      margin-top: 8px;
+    }
+
+    /* Status row */
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .status-row span {
+      font-size: 13px;
+      color: #6b7280;
+    }
+
+    /* Note callout */
+    .note {
+      background: #f0f9ff;
+      border-left: 3px solid #38bdf8;
+      border-radius: 0 8px 8px 0;
+      padding: 12px 16px;
+      font-size: 13px;
+      color: #0369a1;
+      line-height: 1.55;
+      margin-top: 16px;
+    }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      font-size: 12px;
+      color: #d1d5db;
+      margin-top: 40px;
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <div class="page-header">
+    <h1>ARL-Trans · Operations Dashboard</h1>
+    <p>How it works — a guide to every panel, term, and button</p>
+  </div>
+
+  <!-- Overview -->
+  <div class="section">
+    <div class="section-label">Overview</div>
+    <h2>What is this dashboard?</h2>
+    <p class="description">
+      Every morning, an automation workflow (WF1 — Water Report) runs and processes the daily Amercare spreadsheet.
+      It updates ARL-Trans's container tracking systems, calculates last free days, and flags any containers at risk of per diem charges.
+      This dashboard shows the results of that run — what was processed, what needs attention, and what's in the queue.
+    </p>
+    <div class="note">
+      The dashboard is <strong>read-only</strong> — it reflects what the automation did. The only interactive action is the <strong>✓ Done</strong> button on flagged exceptions.
+    </div>
+  </div>
+
+  <!-- Run Status Bar -->
+  <div class="section">
+    <div class="section-label">Panel 1</div>
+    <h2>Run Status Bar</h2>
+    <p class="description">Shows when the last automation run happened, whether it succeeded, and a quick summary of what was processed.</p>
+
+    <div class="term-list">
+      <div class="term">
+        <div class="term-label">Last run</div>
+        <div class="term-body">The date and time the automation last ran. Runs are scheduled daily, typically early morning.</div>
+      </div>
+    </div>
+
+    <hr />
+
+    <p style="font-size:12px; font-weight:500; color:#9ca3af; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:10px;">Status indicators</p>
+    <div class="status-row"><span class="dot green"></span><span><strong style="color:#15803d;">Success</strong> — all steps completed without errors</span></div>
+    <div class="status-row"><span class="dot amber"></span><span><strong style="color:#b45309;">Warning</strong> — completed, but with minor issues (e.g. fallback data used for some rows)</span></div>
+    <div class="status-row"><span class="dot red"></span><span><strong style="color:#b91c1c;">Error</strong> — one or more steps failed</span></div>
+    <div class="status-row"><span class="dot gray"></span><span><strong style="color:#6b7280;">No data</strong> — no run has been recorded yet</span></div>
+
+    <hr />
+
+    <p style="font-size:12px; font-weight:500; color:#9ca3af; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:10px;">Summary numbers</p>
+    <div class="term-list">
+      <div class="term">
+        <div class="term-label">Processed</div>
+        <div class="term-body">Total number of rows read from the spreadsheet this run.</div>
+      </div>
+      <div class="term">
+        <div class="term-label">Added</div>
+        <div class="term-body">New containers that did not exist in the system before this run.</div>
+      </div>
+      <div class="term">
+        <div class="term-label">Updated</div>
+        <div class="term-body">Existing containers whose data (ETA, LFD, status) was refreshed.</div>
+      </div>
+      <div class="term">
+        <div class="term-label">Skipped</div>
+        <div class="term-body">Rows the automation could not process — usually due to missing data or exceptions. See the Exception Queue for details.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Per Diem Alerts -->
+  <div class="section">
+    <div class="section-label">Panel 2</div>
+    <h2>Per Diem Alerts</h2>
+    <p class="description">
+      Containers are listed here when their Last Free Day is within 5 days. These need to be picked up, moved, or released before charges begin (or escalate).
+    </p>
+
+    <div class="term-list">
+      <div class="term">
+        <div class="term-label">Per Diem</div>
+        <div class="term-body"><strong>Daily storage charges</strong> billed by the terminal or port when a container sits past its Last Free Day. Costs accumulate each additional day.</div>
+      </div>
+      <div class="term">
+        <div class="term-label">LFD</div>
+        <div class="term-body"><strong>Last Free Day</strong> — the last date the container can remain at the terminal without incurring per diem charges. After this date, daily fees apply.</div>
+      </div>
+      <div class="term">
+        <div class="term-label">SSL</div>
+        <div class="term-body"><strong>Steamship Line</strong> — the ocean carrier that owns the container. Examples: COSCO, EVERGREEN, MAERSK, MSC, OOCL.</div>
+      </div>
+      <div class="term">
+        <div class="term-label">Days</div>
+        <div class="term-body">How many days remain until (or since) the LFD. Color-coded by urgency:</div>
+      </div>
+    </div>
+
+    <div class="pill-row">
+      <span class="pill red">1 day</span>
+      <span style="font-size:13px; color:#6b7280; align-self:center;">Urgent — charges may already be accruing</span>
+    </div>
+    <div class="pill-row">
+      <span class="pill orange">2–3 days</span>
+      <span style="font-size:13px; color:#6b7280; align-self:center;">Act soon</span>
+    </div>
+    <div class="pill-row" style="margin-bottom:4px;">
+      <span class="pill amber">4–5 days</span>
+      <span style="font-size:13px; color:#6b7280; align-self:center;">Heads up — monitor this week</span>
+    </div>
+  </div>
+
+  <!-- Exception Queue -->
+  <div class="section">
+    <div class="section-label">Panel 3</div>
+    <h2>Exception Queue</h2>
+    <p class="description">
+      Containers the automation flagged and could not process normally. Two types: ones that need Gary's review, and ones that are purely informational.
+    </p>
+
+    <div class="term-list">
+      <div class="term">
+        <div class="term-label">Reuse Load</div>
+        <div class="term-body">
+          A container number that appeared more than once in the spreadsheet — a potential <strong>duplicate entry</strong>.
+          The automation flagged it because processing it twice could corrupt the data.
+          Gary reviews it to determine if it's a real duplicate or a data error, then clicks <strong>✓ Done</strong> to dismiss it.
+        </div>
+      </div>
+      <div class="term">
+        <div class="term-label">Exam Flag</div>
+        <div class="term-body">
+          A container that has been flagged by <strong>US Customs for examination</strong>. It is physically held at the port pending inspection.
+          The automation skipped it intentionally — no update is possible until the container is released.
+          <strong>No action needed</strong> from Gary. The label <em>"Under customs hold — row skipped"</em> confirms this.
+          It will clear on its own once the hold is lifted and the next run processes it.
+        </div>
+      </div>
+    </div>
+
+    <hr />
+
+    <p style="font-size:12px; font-weight:500; color:#9ca3af; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:10px;">The Done button</p>
+    <div class="btn-example">✓ Done</div>
+    <div class="term-list" style="margin-top:12px;">
+      <div class="term">
+        <div class="term-label">What it does</div>
+        <div class="term-body">Marks a Reuse Load exception as reviewed and removes it from the queue for the rest of the day's run.</div>
+      </div>
+      <div class="term">
+        <div class="term-label">Does it persist?</div>
+        <div class="term-body">No. The dismissal is per-run. The next time the automation runs and sends a new report, the queue resets — any unresolved exceptions in the new data will reappear.</div>
+      </div>
+      <div class="term">
+        <div class="term-label">Exam flags</div>
+        <div class="term-body">Exam flags do <strong>not</strong> have a Done button. They clear automatically once the customs hold is lifted.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Container Table -->
+  <div class="section">
+    <div class="section-label">Panel 4</div>
+    <h2>Container Table</h2>
+    <p class="description">
+      Full list of all containers tracked in the current run. Filterable by terminal location, sortable by date.
+    </p>
+
+    <div class="term-list">
+      <div class="term">
+        <div class="term-label">Container #</div>
+        <div class="term-body">The unique alphanumeric ID stamped on the physical shipping container — 4 letters + 7 digits (e.g., <code style="font-size:12px; background:#f3f4f6; padding:1px 5px; border-radius:4px;">FCIU9906716</code>).</div>
+      </div>
+      <div class="term">
+        <div class="term-label">Location</div>
+        <div class="term-body">The terminal or warehouse where the container currently is. Examples: Exton, Stockton, Carson, NJ, Oakland, Ontario, Vacaville.</div>
+      </div>
+      <div class="term">
+        <div class="term-label">ETA</div>
+        <div class="term-body"><strong>Estimated Time of Arrival</strong> — the date the container is expected to arrive at the destination.</div>
+      </div>
+      <div class="term">
+        <div class="term-label">LFD</div>
+        <div class="term-body"><strong>Last Free Day</strong> — same as in Per Diem Alerts. The deadline before storage charges begin.</div>
+      </div>
+      <div class="term">
+        <div class="term-label">SSL</div>
+        <div class="term-body"><strong>Steamship Line</strong> — the ocean carrier that owns the container.</div>
+      </div>
+      <div class="term">
+        <div class="term-label">PO</div>
+        <div class="term-body"><strong>Purchase Order</strong> number — ties the container to a specific order in ARL-Trans's system.</div>
+      </div>
+    </div>
+
+    <hr />
+
+    <p style="font-size:12px; font-weight:500; color:#9ca3af; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:10px;">Controls</p>
+    <div class="term-list">
+      <div class="term">
+        <div class="term-label">Location filter</div>
+        <div class="term-body">Dropdown to show only containers at a specific terminal. Select <strong>All</strong> to see everything.</div>
+      </div>
+      <div class="term">
+        <div class="term-label">Sort: LFD</div>
+        <div class="term-body">Sorts by Last Free Day — containers closest to their deadline appear first. Good for prioritizing pickups.</div>
+      </div>
+      <div class="term">
+        <div class="term-label">Sort: ETA</div>
+        <div class="term-body">Sorts by Estimated Time of Arrival — containers arriving soonest appear first.</div>
+      </div>
+      <div class="term">
+        <div class="term-label">Show all / Show less</div>
+        <div class="term-body">The table shows 10 rows by default. Click <strong>Show all N containers</strong> to expand the full list, or <strong>Show less</strong> to collapse it again.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Run Log -->
+  <div class="section">
+    <div class="section-label">Panel 5</div>
+    <h2>Run Log</h2>
+    <p class="description">
+      A step-by-step record of everything the automation did during the last run. Collapsed by default — click the header to expand.
+    </p>
+
+    <div class="term-list">
+      <div class="term">
+        <div class="term-label">▸ / ▾</div>
+        <div class="term-body">Click the <strong>Run Log</strong> header to expand or collapse the log entries.</div>
+      </div>
+      <div class="term">
+        <div class="term-label">Time</div>
+        <div class="term-body">The timestamp (HH:MM:SS) when each step ran, relative to the start of the run.</div>
+      </div>
+    </div>
+
+    <hr />
+
+    <p style="font-size:12px; font-weight:500; color:#9ca3af; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:10px;">Step status colours</p>
+    <div class="term-list">
+      <div class="term">
+        <div class="term-label" style="background:#f3f4f6; color:#6b7280;">ok</div>
+        <div class="term-body">Step completed normally. No action needed.</div>
+      </div>
+      <div class="term">
+        <div class="term-label" style="background:#fffbeb; color:#b45309;">warning</div>
+        <div class="term-body">Step completed but with a caveat — for example, <em>"LFD fallback used — 3 rows (blank free days)"</em> means 3 containers had no free-day data in the spreadsheet so a default was applied.</div>
+      </div>
+      <div class="term">
+        <div class="term-label" style="background:#fef2f2; color:#b91c1c;">error</div>
+        <div class="term-body">Step failed. If the overall run status is Error, look here to find which step broke.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">ARL-Trans · Operations Dashboard · WF1 Water Report</div>
+
+</div>
+</body>
+</html>

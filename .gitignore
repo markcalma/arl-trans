@@ -1,0 +1,19 @@
+# Dashboard
+dashboard/node_modules/
+dashboard/.next/
+dashboard/data/
+dashboard/.env.local
+dashboard/google-tokens.json
+
+# Redact service
+redact/venv/
+redact/__pycache__/
+redact/*.pdf
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+*.swp

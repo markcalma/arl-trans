@@ -153,5 +153,12 @@ OAuth tokens are stored in `dashboard/google-tokens.json` (gitignored, generated
 At the end of each session, update this section:
 
 **Last worked on:** 2026-10-20  
-**What was done:** Set up monorepo structure, copied dashboard + redact service files, created project scaffolding  
-**Next:** Install npm deps, create lib/db.ts, lib/gmail.ts, lib/sheets.ts, lib/claude.ts, lib/poller.ts, instrumentation.ts, update wfdo-approve route to use Gmail + Sheets directly
+**What was done:** Full Phase 1 rebuild — monorepo created at `C:\Users\28mar\OneDrive\Dev\arl-trans`, GitHub repo at `github.com/markcalma/arl-trans`. All new libs created (db.ts, gmail.ts, sheets.ts, claude.ts, poller.ts). wfdo-approve now sends via Gmail API + writes to Sheets. SQLite replaces flat JSON files. Poller starts on server boot via instrumentation.ts.  
+**Next steps before testing:**
+1. Set up Google Cloud project (console.cloud.google.com)
+2. Enable Gmail API + Google Sheets API
+3. Create OAuth 2.0 credentials (Desktop app type), copy Client ID + Client Secret
+4. Copy `.env.local.example` → `.env.local`, fill in: ANTHROPIC_API_KEY, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_SHEET_ID, DO_SENDER_EMAILS
+5. Run `npm run auth` in `dashboard/` to generate google-tokens.json
+6. Run `npm run dev` — dashboard starts on port 3002, redact service on port 8000
+7. Inspect the Google Sheet to confirm column order in lib/sheets.ts matches Load Board + Master Container List tabs

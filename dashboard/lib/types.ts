@@ -106,10 +106,16 @@ export interface WF3Day {
   invoices: WF3Invoice[]
 }
 
-export type WFDOOrderStatus = 'pending_review' | 'sent' | 'needs_manual_review'
+export type WFDOOrderStatus = 'pending_redaction' | 'redacted' | 'sent' | 'needs_manual_review'
 
 export interface WFDOOrder {
   id: string
+  status: WFDOOrderStatus
+  receivedAt: string
+  sender: string
+  subject?: string
+  gmailId?: string
+  pdfPath?: string
   containerNumber: string
   masterBL: string
   arrivalDate: string
@@ -124,10 +130,9 @@ export interface WFDOOrder {
   nvoName: string
   carrierEmail: string
   carrierNotes: string
-  status: WFDOOrderStatus
+  packingListAttached: boolean
   processedAt: string
   sentAt?: string
-  packingListAttached: boolean
 }
 
 export interface WFDODay {

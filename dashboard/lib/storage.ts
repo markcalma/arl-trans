@@ -125,32 +125,18 @@ export function addWF3Resolved(containerNumber: string): void {
   }
 }
 
-export function getTodayDOOrders(): WFDODay {
-  return readJson<WFDODay>('wfdo-today.json', { date: '', orders: [] })
-}
-
-export function appendDOOrder(date: string, order: WFDOOrder): void {
-  const current = getTodayDOOrders()
-  const existing = current.orders.findIndex((o) => o.id === order.id)
-  if (current.date !== date) {
-    writeJson('wfdo-today.json', { date, orders: [order] })
-  } else if (existing >= 0) {
-    current.orders[existing] = order
-    writeJson('wfdo-today.json', current)
-  } else {
-    writeJson('wfdo-today.json', { date, orders: [...current.orders, order] })
-  }
-}
+// WF-DO functions delegate to SQLite via lib/db.ts
+import { getAllDOOrders, insertDOOrder, updateDOOrder as dbUpdateDOOrder, getDOOrder } from './db'
+export { getAllDOOrders, insertDOOrder, getDOOrder }
 
 export function updateDOOrder(id: string, updates: Partial<WFDOOrder>): void {
-  const day = getTodayDOOrders()
-  const idx = day.orders.findIndex((o) => o.id === id)
-  if (idx >= 0) {
-    day.orders[idx] = { ...day.orders[idx], ...updates }
-    writeJson('wfdo-today.json', day)
-  }
+  dbUpdateDOOrder(id, updates)
 }
 
-export function getDOOrder(id: string): WFDOOrder | undefined {
-  return getTodayDOOrders().orders.find((o) => o.id === id)
+export function getTodayDOOrders(): WFDODay {
+  return { date: new Date().toISOString().slice(0, 10), orders: getAllDOOrders() }
+}
+
+export function appendDOOrder(_date: string, order: WFDOOrder): void {
+  insertDOOrder(order)
 }

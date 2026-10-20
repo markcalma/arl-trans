@@ -3,12 +3,19 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --port 3002",
+    "dev": "concurrently -n dashboard,redact -c blue,green \"next dev --port 3002\" \"uvicorn main:app --app-dir ../redact --port 8000\"",
+    "dashboard": "next dev --port 3002",
+    "redact": "uvicorn main:app --app-dir ../redact --port 8000",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "auth": "ts-node --project tsconfig.json scripts/google-auth.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.135.0",
+    "better-sqlite3": "^13.0.3",
+    "concurrently": "^10.0.6",
+    "googleapis": "^186.0.0",
     "next": "16.3.4",
     "react": "19.2.8",
     "react-dom": "19.2.8"
@@ -16,6 +23,7 @@
   "devDependencies": {
     "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

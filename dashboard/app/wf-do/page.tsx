@@ -1,4 +1,4 @@
-import { getTodayDOOrders } from '@/lib/storage'
+import { getAllDOOrders } from '@/lib/db'
 import { WFDOPendingQueue } from '@/components/WFDOPendingQueue'
 import { WFDOSentTable } from '@/components/WFDOSentTable'
 import { LogoutButton } from '@/components/LogoutButton'
@@ -6,7 +6,7 @@ import { LogoutButton } from '@/components/LogoutButton'
 export const dynamic = 'force-dynamic'
 
 export default async function WFDOPage() {
-  const day = getTodayDOOrders()
+  const orders = getAllDOOrders()
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -18,8 +18,8 @@ export default async function WFDOPage() {
           </div>
           <LogoutButton />
         </div>
-        <WFDOPendingQueue orders={day.orders} />
-        <WFDOSentTable orders={day.orders} />
+        <WFDOPendingQueue orders={orders} />
+        <WFDOSentTable orders={orders} />
       </div>
     </main>
   )

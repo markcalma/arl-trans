@@ -153,7 +153,7 @@ OAuth tokens are stored in `dashboard/google-tokens.json` (gitignored, generated
 At the end of each session, update this section:
 
 **Last worked on:** 2026-10-20  
-**What was done:** Full Phase 1 rebuild — monorepo created at `C:\Users\28mar\OneDrive\Dev\arl-trans`, GitHub repo at `github.com/markcalma/arl-trans`. All new libs created (db.ts, gmail.ts, sheets.ts, claude.ts, poller.ts). wfdo-approve now sends via Gmail API + writes to Sheets. SQLite replaces flat JSON files. Poller starts on server boot via instrumentation.ts.  
+**What was done:** Full Phase 1 rebuild — monorepo created at `C:\Users\28mar\OneDrive\Dev\greg-clarke-arlv2`, GitHub repo at `github.com/markcalma/arl-trans`. All new libs created (db.ts, gmail.ts, sheets.ts, claude.ts, poller.ts). wfdo-approve now sends via Gmail API + writes to Sheets. SQLite replaces flat JSON files. Poller starts on server boot via instrumentation.ts.  
 **Next steps before testing:**
 1. Set up Google Cloud project (console.cloud.google.com)
 2. Enable Gmail API + Google Sheets API

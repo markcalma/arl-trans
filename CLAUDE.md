@@ -81,11 +81,29 @@ npx ts-node scripts/google-auth.ts
 - `dashboard/components/WFDORedactEditor.tsx` — canvas-based redaction UI
 - `dashboard/app/api/wfdo-approve/[id]/route.ts` — approval: sends email + updates Sheets
 
-### WF1 — Water Report (Phase 2, not started)
+### WF1 — Water Report (Phase 2, done)
 
-Gary receives a water report Excel from Amercare → parse containers → update Google Sheets (Master Container List + Load Board) → Gary enters LFDs manually → send emails to Amercare and carriers.
+Amercare sends an email with an `.xlsm` Excel attachment (subject: "ACR Truck Dispatch Report"). Gary reviews it in the dashboard and approves → rows written to both Load Board and Master Container List.
 
-No port scraping.
+**Flow:**
+1. Gmail poller (every 60s) detects water report emails via Claude Haiku classifier
+2. Excel attachment parsed by `lib/wf1-parser.ts` (range A5:AE1000; key cols: G=container#, A=destination, B=ETA, D=free days, X=SSL, AB=terminal, J=size, K=BL, L=PO)
+3. Stored in SQLite (`water_report_batches` table), appears in dashboard at `/`
+4. Gary reviews batch → "Approve → Sheets" button → writes each container to Load Board (tab by destination) + Master Container List
+5. No email sending in Phase 2 — Sheets only
+
+**Key files:**
+- `dashboard/lib/wf1-parser.ts` — Excel + plain text email parsing
+- `dashboard/lib/claude.ts` — `classifyEmailAsWaterReport()` (Claude Haiku)
+- `dashboard/lib/gmail.ts` — `pollWaterReportEmails()`
+- `dashboard/lib/poller.ts` — `runWF1Poll()` starts alongside WF-DO poller
+- `dashboard/lib/db.ts` — `water_report_batches` table, CRUD
+- `dashboard/lib/sheets.ts` — `appendWF1ContainerToLoadBoard()` + `appendWF1ContainerToMasterList()`
+- `dashboard/components/WF1BatchList.tsx` — Gary's review UI (filter, expand, approve, reject)
+- `dashboard/app/api/wf1-approve/[id]/route.ts` — writes all containers to both Sheets
+- `dashboard/app/api/wf1-reject/[id]/route.ts` — marks batch rejected
+- `dashboard/app/api/wf1-batches/route.ts` — list all batches
+- `dashboard/app/page.tsx` — WF1 dashboard page (server component)
 
 ### WF2 / WF3 — Dispatch + Invoice (Phase 3, not started)
 
@@ -127,14 +145,23 @@ OAuth tokens are stored in `dashboard/google-tokens.json` (gitignored, generated
 | Area | Status |
 |---|---|
 | Monorepo structure | Done |
-| WF-DO UI components | Done (carried from prior build) |
-| SQLite layer (lib/db.ts) | In progress |
-| Gmail polling | In progress |
-| Google Sheets integration | In progress |
-| Claude Vision parser | In progress |
-| WF-DO approval flow (send + Sheets) | In progress |
-| WF1 | Not started |
-| WF2 / WF3 | Not started — waiting on PortPro |
+| WF-DO UI components | Done |
+| SQLite layer (lib/db.ts) | Done |
+| Gmail polling | Done |
+| Google Sheets integration | Done — column order needs verification against real sheet |
+| Claude Vision parser | Done |
+| WF-DO approval flow (send + Sheets) | Done |
+| WF-DO approve/re-redact UI buttons | Done |
+| TypeScript — 0 errors | Done |
+| ESLint — 0 errors, 0 warnings | Done |
+| Next.js build — clean | Done |
+| Python packages (fastapi, uvicorn, pymupdf) | Done — installed globally |
+| Google Cloud OAuth setup | Done — google-tokens.json generated |
+| Google Sheet column order verification | Done — sheets.ts fully rewritten against real sheets |
+| AI email classification (classifyEmailAsDO) | Done — Claude Haiku classifies before PDF parsing |
+| Railway deployment | Pending |
+| WF1 — Water Report | Live tested (session 5) — 356 containers parsed, batch appeared in dashboard ✅ |
+| WF2 / WF3 | Removed from nav — not started, waiting on PortPro |
 
 ---
 
@@ -145,6 +172,15 @@ OAuth tokens are stored in `dashboard/google-tokens.json` (gitignored, generated
 - **Gmail polling** — dashboard pulls from Gmail every 60s via `instrumentation.ts`. No inbound webhooks.
 - **Monorepo** — dashboard + redact service in one repo for easier session handoff and single start command.
 - **Python for PDF** — PyMuPDF is the best PDF library; kept as a sidecar service on port 8000.
+- **AI email classification** — Claude Haiku classifies every unread email with attachment before downloading PDF. No sender whitelist needed. `DO_SENDER_EMAILS` env var is unused.
+- **WF1 filename-first classification** — `pollWaterReportEmails()` checks attachment filenames against `/ACR.*Truck.*Dispatch/i` and `/AMERCARE/i` before calling Claude. Known filenames skip the AI call entirely.
+- **WF1 dual Excel format** — `parseWaterReportExcel()` auto-detects two formats: (A) AMERCARE per-location xlsx (header row 1, container col D) and (B) ACR Truck Dispatch Report xlsm from `podium@oocllogistics.com` (header row 5, container col G). Detection checks `row[0][3]` vs `row[4][6]` for "Container".
+- **WF1 upsert (in progress)** — `appendWF1ContainerToLoadBoard/MasterList` being replaced with `upsertWF1ContainersToLoadBoard/MasterList` — reads container# column once per tab, updates existing rows, appends new ones. Not yet wired to approve route.
+- **Two separate Google Sheet IDs** — `GOOGLE_SHEET_ID_MASTER` (Master Container List) and `GOOGLE_SHEET_ID_LOADBOARD` (Load Board). Load Board tab is routed by delivery location (NY/NJ, Exton/PA, Vacaville, Ontario Amer, etc.).
+- **WF2/WF3 removed from nav** — PortPro not ready. Routes/pages still exist but not linked.
+- **WF1 Sheets batch writes** — `upsertWF1ContainersToLoadBoard/MasterList` uses `batchUpdate` (all updates) + single `append` (all new rows) per tab. Reduces 356 individual API calls to ~3 per tab. ~5 seconds vs ~4 minutes.
+- **WF1 Re-sync button** — approved batches have a "Re-sync to Sheets" button that re-runs the upsert without requiring pending_review status. Used for recovery from partial writes. Route: `app/api/wf1-resync/[id]/route.ts`.
+- **WF1 approve result banner** — after approve/resync, shows per-tab breakdown: tab name, added count, updated count. Stored in `lastResult` client state, persists across router.refresh().
 
 ---
 
@@ -152,13 +188,86 @@ OAuth tokens are stored in `dashboard/google-tokens.json` (gitignored, generated
 
 At the end of each session, update this section:
 
-**Last worked on:** 2026-10-20  
-**What was done:** Full Phase 1 rebuild — monorepo created at `C:\Users\28mar\OneDrive\Dev\greg-clarke-arlv2`, GitHub repo at `github.com/markcalma/arl-trans`. All new libs created (db.ts, gmail.ts, sheets.ts, claude.ts, poller.ts). wfdo-approve now sends via Gmail API + writes to Sheets. SQLite replaces flat JSON files. Poller starts on server boot via instrumentation.ts.  
-**Next steps before testing:**
-1. Set up Google Cloud project (console.cloud.google.com)
-2. Enable Gmail API + Google Sheets API
-3. Create OAuth 2.0 credentials (Desktop app type), copy Client ID + Client Secret
-4. Copy `.env.local.example` → `.env.local`, fill in: ANTHROPIC_API_KEY, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_SHEET_ID, DO_SENDER_EMAILS
-5. Run `npm run auth` in `dashboard/` to generate google-tokens.json
-6. Run `npm run dev` — dashboard starts on port 3002, redact service on port 8000
-7. Inspect the Google Sheet to confirm column order in lib/sheets.ts matches Load Board + Master Container List tabs
+**Last worked on:** 2026-10-20 (session 7)
+
+**What was done (session 1):** Full Phase 1 rebuild — monorepo created at `C:\Users\28mar\OneDrive\Dev\greg-clarke-arlv2`, GitHub repo at `github.com/markcalma/arl-trans`. All new libs created (db.ts, gmail.ts, sheets.ts, claude.ts, poller.ts). wfdo-approve now sends via Gmail API + writes to Sheets. SQLite replaces flat JSON files. Poller starts on server boot via instrumentation.ts.
+
+**What was done (session 2):**
+- Fixed 4 TypeScript errors: stale `pending_review` status in WFDOPendingQueue, Gmail SDK null type mismatch in gmail.ts, removed invalid `instrumentationHook` from next.config.ts, installed missing `dotenv` package for google-auth.ts
+- Fixed `wfdo-re-redact` route — was still calling dead n8n webhook; now resets DO status to `pending_redaction` in SQLite
+- Added **Approve & Send** button, **Re-redact** button, and **Carrier Email** field to `WFDOPendingQueue` (these were missing — workflow couldn't complete without them)
+- ESLint: fixed `require()` in test file, unused params, ternary-as-statement, img element warning
+- Installed Python packages: `fastapi`, `uvicorn`, `python-multipart` (were missing)
+- TypeScript: 0 errors | ESLint: 0 errors 0 warnings | Next.js build: clean | Python syntax: clean
+
+**What was done (session 3):**
+- AI email classification: added `classifyEmailAsDO()` to `lib/claude.ts` using Claude Haiku — replaces sender whitelist
+- `lib/gmail.ts`: removed `DO_SENDER_EMAILS` filter, added `extractBodyText()`, calls classifier before downloading attachments. Non-DO emails skipped (not marked read), tracked in memory via `skippedGmailIds`
+- `lib/sheets.ts`: completely rewritten — two separate sheet IDs, location-based Load Board tab routing (7 tabs), `LT M-DD-YY` format for column K, correct column mappings for both sheets
+- `.env.local`: filled in all credentials. `GOOGLE_SHEET_ID` replaced with `GOOGLE_SHEET_ID_MASTER` + `GOOGLE_SHEET_ID_LOADBOARD`
+- `lib/gmail.ts`: added `https://www.googleapis.com/auth/spreadsheets` scope (was missing)
+- `package.json`: installed `tsx`, replaced `ts-node` auth script with `tsx` (ts-node incompatible with Next.js tsconfig)
+- Google Cloud OAuth: created project `arl-trans`, enabled Gmail + Sheets APIs, created Desktop OAuth client, ran auth script — `google-tokens.json` generated
+- `NavBar.tsx`: removed WF2 and WF3 links — only WF1 and WF-DO shown
+- App running: `npm run dev` → dashboard port 3002, Python service port 8000
+
+**What was done (session 4):**
+- Scanned old n8n project at `C:\Users\28mar\OneDrive\Dev\greg-clarke` to understand WF1 structure
+- Installed `xlsx` (SheetJS) package for Excel parsing
+- `lib/types.ts`: added `WF1Container` and `WF1Batch` types
+- `lib/db.ts`: added `water_report_batches` table + full CRUD (`insertWF1Batch`, `updateWF1BatchStatus`, `getWF1Batch`, `getPendingWF1Batches`, `getAllWF1Batches`, `wf1GmailIdExists`)
+- `lib/wf1-parser.ts`: NEW — `parseWaterReportExcel()` (SheetJS, range A5:AE1000) + `parseWaterReportText()` (plain text/HTML work order format)
+- `lib/claude.ts`: added `classifyEmailAsWaterReport()` using Claude Haiku
+- `lib/gmail.ts`: added `pollWaterReportEmails()` — separate from WF-DO poll, marks read after storage
+- `lib/poller.ts`: added `runWF1Poll()` — starts alongside WF-DO poller via same `startPoller()` call
+- `lib/sheets.ts`: added CARSON, STOCKTON, OAKLAND tabs to `resolveLoadBoardTab()`; added `appendWF1ContainerToLoadBoard()` and `appendWF1ContainerToMasterList()`
+- `app/api/wf1-batches/route.ts`: NEW — lists all batches
+- `app/api/wf1-approve/[id]/route.ts`: NEW — writes containers to both sheets, marks approved
+- `app/api/wf1-reject/[id]/route.ts`: NEW — marks rejected
+- `app/page.tsx`: replaced old n8n-era WF1 page with new server component + `WF1BatchList` client component
+- `components/WF1BatchList.tsx`: NEW — filter tabs, expand containers table, Approve → Sheets, Reject
+- TypeScript: 0 errors | ESLint: 0 errors 0 warnings | Next.js build: clean
+
+**Phase structure:**
+- Phase 1 — WF-DO Pipeline ✅ DONE
+- Phase 2 — WF1 Water Report ✅ DONE
+- Phase 3 — Railway Deployment 🔜 NEXT
+- Phase 4 — WF2/WF3 PortPro Integration (waiting on API access)
+
+**What was done (session 5):**
+- Inspected real Amercare sample emails in `amercare-sample-emails/` — discovered TWO Excel formats
+- `lib/wf1-parser.ts`: Rewrote `parseWaterReportExcel()` to auto-detect and handle both formats:
+  - Format A: AMERCARE per-location xlsx (EXTON/CARSEN/STOCKTON) — header row 1, container at col D (index 3), free days col C, PO col E, BL col F, terminal col H
+  - Format B: ACR Truck Dispatch Report xlsm from `podium@oocllogistics.com` — header row 5, container col G (index 6), free days col D, BL col K, PO col L, SSL col X, terminal col AB
+  - Detection: `row[0][3] === 'Container'` → Format A; `row[4][6] === 'Container'` → Format B
+- `lib/claude.ts`: Added workspace ID header support (`ANTHROPIC_WORKSPACE_ID` env var) for personal API keys
+- `lib/gmail.ts`: Added `extractFilenamesFromPayload()` + filename-first classification in `pollWaterReportEmails()` — skips Claude call when filename matches `/ACR.*Truck.*Dispatch/i` or `/AMERCARE/i`
+- **Live test passed**: Sent ACR xlsm to Gmail → 356 containers parsed → batch appeared in dashboard ✅
+- `lib/sheets.ts`: Added `upsertWF1ContainersToLoadBoard()` and `upsertWF1ContainersToMasterList()` — reads container# column once per tab, updates existing rows, appends new ones.
+
+**What was done (session 6):**
+- `app/api/wf1-approve/[id]/route.ts`: Updated to call `upsertWF1ContainersToLoadBoard/MasterList` in parallel (Promise.allSettled). Response now returns `{ loadBoard: { written, updated, tabs }, masterList: { written, updated, tabs } }`
+- `lib/sheets.ts`: Rewrote upsert functions to use batch API calls — all updates in one `batchUpdate`, all appends in one `append` per tab. Reduces 356 individual API calls to ~3 per tab. Added `UpsertResult` type with per-tab breakdown (`tabs: Record<string, { written, updated }>`).
+- `app/api/wf1-resync/[id]/route.ts`: NEW — re-runs upsert on any batch regardless of status. Used for recovery from partial writes.
+- `components/WF1BatchList.tsx`: Added `lastResult` state showing per-tab breakdown after approve/resync (green banner with Load Board tabs + Master List). Fixed `data.containersWritten` bug (was undefined). Added **Re-sync to Sheets** button on approved batches.
+- **Live test passed**: Approve → 356 containers written to STOCKTON (187), Exton/PA (162), CARSON (7) + Master List (356). ✅
+- **Re-sync tested multiple times**: each run caught missed rows from partial earlier writes. Final state: 0 added / 356 updated across all tabs — fully idempotent. ✅
+- TypeScript: 0 errors
+
+**What was done (session 7):**
+- `dashboard/railway.toml`: NEW — nixpacks build, `npm run start`, health check at `/api/health`, restart on failure
+- `redact/railway.toml`: NEW — nixpacks build, `uvicorn main:app --host 0.0.0.0 --port $PORT`, health check at `/health`
+- `dashboard/app/api/health/route.ts`: NEW — returns `{ok: true}` for Railway health checks
+- `dashboard/lib/gmail.ts`: Changed `TOKENS_PATH` from `google-tokens.json` → `data/google-tokens.json` (same persistent volume as SQLite). Added `GOOGLE_TOKENS_JSON` env var seed — on startup if file missing, writes from env var (Railway first-run flow).
+- `dashboard/.env.local.example`: Added `GOOGLE_TOKENS_JSON=` (Railway-only)
+- Moved local `google-tokens.json` → `dashboard/data/google-tokens.json` (already gitignored under `dashboard/data/`)
+- TypeScript: 0 errors | Next.js build: clean
+
+**Next session (Phase 3 — Railway Deployment, continued):**
+Railway services are ready to deploy. Steps remaining:
+1. Create Railway project + two services (dashboard, redact) via Railway dashboard
+2. Set each service root directory: `dashboard/` and `redact/`
+3. Add persistent volume on dashboard service → mount at `/app/data`
+4. Set env vars on dashboard service (copy from `.env.local`; set `GOOGLE_TOKENS_JSON` from `data/google-tokens.json` contents; set `REDACT_SERVICE_URL` to redact service's Railway private URL)
+5. Deploy both services (`railway up` or push to GitHub with Railway GitHub integration)
+6. Verify health checks pass and poller starts

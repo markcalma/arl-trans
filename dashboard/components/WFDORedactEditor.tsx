@@ -152,6 +152,7 @@ export function WFDORedactEditor({
         Redactions&rdquo;.
       </p>
       <div className="relative rounded overflow-hidden border border-gray-100 select-none">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           ref={imgRef}
           src={`/api/wfdo-render-page/${encodeURIComponent(orderId)}`}

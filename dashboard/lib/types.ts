@@ -139,3 +139,36 @@ export interface WFDODay {
   date: string
   orders: WFDOOrder[]
 }
+
+// ---------------------------------------------------------------------------
+// WF1 — Water Report
+// ---------------------------------------------------------------------------
+
+export interface WF1Container {
+  containerNumber: string
+  destination: string
+  eta: string            // ISO date string
+  freeDays: number | null
+  sslLine: string
+  terminal: string
+  size: string
+  bl: string
+  po: string
+  sealNumber: string
+}
+
+export type WF1BatchStatus = 'pending_review' | 'approved' | 'rejected'
+
+export interface WF1Batch {
+  id: string
+  status: WF1BatchStatus
+  receivedAt: string
+  sender: string
+  subject: string
+  gmailId?: string
+  sourceFormat: 'excel' | 'text'
+  containers: WF1Container[]
+  containerCount: number
+  reviewedAt?: string
+  sheetsWrittenAt?: string
+}

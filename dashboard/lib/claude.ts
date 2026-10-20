@@ -1,6 +1,11 @@
 import Anthropic from '@anthropic-ai/sdk'
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+const client = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+  ...(process.env.ANTHROPIC_WORKSPACE_ID && {
+    defaultHeaders: { 'anthropic-workspace-id': process.env.ANTHROPIC_WORKSPACE_ID },
+  }),
+})
 
 export interface ParsedDO {
   containerNumber: string
@@ -91,6 +96,36 @@ export async function parseDOFromText(text: string): Promise<ParsedDO> {
 
   const responseText = response.content[0].type === 'text' ? response.content[0].text : ''
   return parseJsonResponse(responseText)
+}
+
+export async function classifyEmailAsDO(subject: string, body: string): Promise<boolean> {
+  const response = await client.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 5,
+    messages: [
+      {
+        role: 'user',
+        content: `Does this email contain or reference a delivery order (DO), freight release, or shipping document? Reply only "yes" or "no".\n\nSubject: ${subject}\n\nBody: ${body.slice(0, 800)}`,
+      },
+    ],
+  })
+  const text = response.content[0].type === 'text' ? response.content[0].text.toLowerCase().trim() : 'no'
+  return text.startsWith('yes')
+}
+
+export async function classifyEmailAsWaterReport(subject: string, body: string): Promise<boolean> {
+  const response = await client.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 5,
+    messages: [
+      {
+        role: 'user',
+        content: `Is this email a shipping/logistics water report or truck dispatch report (e.g. from Amercare, an ACR Truck Dispatch Report, or similar container arrival schedule)? Reply only "yes" or "no".\n\nSubject: ${subject}\n\nBody: ${body.slice(0, 800)}`,
+      },
+    ],
+  })
+  const text = response.content[0].type === 'text' ? response.content[0].text.toLowerCase().trim() : 'no'
+  return text.startsWith('yes')
 }
 
 function parseJsonResponse(text: string): ParsedDO {

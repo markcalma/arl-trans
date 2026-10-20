@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import fs from 'fs'
 
 test('dashboard loads with mock data', async ({ page }) => {
   await page.goto('/')
@@ -39,7 +40,7 @@ test('per diem alerts panel renders with urgent containers', async ({ page }) =>
 })
 
 test.afterEach(async ({ request }) => {
-  const payload = require('fs').readFileSync('./mock/wf1-payload.json', 'utf8')
+  const payload = fs.readFileSync('./mock/wf1-payload.json', 'utf8')
   await request.post('/api/wf1-webhook', { data: JSON.parse(payload) })
 })
 
@@ -126,7 +127,7 @@ test('WF2 webhook rejects wrong secret', async ({ request }) => {
 })
 
 test('WF2 webhook accepts valid secret and appends order', async ({ request }) => {
-  const payload = require('fs').readFileSync('./mock/wf2-payload.json', 'utf8')
+  const payload = fs.readFileSync('./mock/wf2-payload.json', 'utf8')
   const res = await request.post('/api/wf2-webhook', { data: JSON.parse(payload) })
   expect(res.status()).toBe(200)
   const body = await res.json()
@@ -151,7 +152,6 @@ test.describe('WF2 — Order Intake', () => {
   })
 
   test.afterEach(async () => {
-    const fs = require('fs')
     const seed = fs.readFileSync('./mock/wf2-seed.json', 'utf8')
     fs.writeFileSync('./data/wf2-today.json', seed)
     fs.writeFileSync('./data/wf2-handled.json', '[]')
@@ -222,7 +222,7 @@ test('WF3 webhook rejects wrong secret', async ({ request }) => {
 })
 
 test('WF3 webhook accepts valid secret and appends invoice', async ({ request }) => {
-  const payload = require('fs').readFileSync('./mock/wf3-payload.json', 'utf8')
+  const payload = fs.readFileSync('./mock/wf3-payload.json', 'utf8')
   const res = await request.post('/api/wf3-webhook', { data: JSON.parse(payload) })
   expect(res.status()).toBe(200)
   const body = await res.json()
@@ -240,7 +240,6 @@ test.describe('WF3 — Invoice Review', () => {
   })
 
   test.afterEach(async () => {
-    const fs = require('fs')
     const seed = fs.readFileSync('./mock/wf3-seed.json', 'utf8')
     fs.writeFileSync('./data/wf3-today.json', seed)
     fs.writeFileSync('./data/wf3-resolved.json', '[]')
@@ -312,13 +311,11 @@ test.describe('WF-DO proxy routes', () => {
 
 test.describe('WF-DO — Redact Editor', () => {
   test.beforeAll(async () => {
-    const fs = require('fs')
     const seed = fs.readFileSync('./mock/wfdo-seed.json', 'utf8')
     fs.writeFileSync('./data/wfdo-today.json', seed)
   })
 
   test.afterAll(async () => {
-    const fs = require('fs')
     fs.writeFileSync('./data/wfdo-today.json', JSON.stringify({ date: '', orders: [] }))
   })
 

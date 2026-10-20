@@ -8,9 +8,11 @@ export function WFDOPendingQueue({ orders }: { orders: WFDOOrder[] }) {
   const [downloading, setDownloading] = useState<string | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
   const [edits, setEdits] = useState<Record<string, Partial<WFDOOrder>>>({})
+  const [approving, setApproving] = useState<string | null>(null)
+  const [approveError, setApproveError] = useState<Record<string, string>>({})
 
   const pending = orders.filter(
-    (o) => o.status === 'pending_review' || o.status === 'needs_manual_review'
+    (o) => o.status === 'pending_redaction' || o.status === 'needs_manual_review'
   )
 
   function getField<K extends keyof WFDOOrder>(o: WFDOOrder, key: K): WFDOOrder[K] {
@@ -59,6 +61,34 @@ export function WFDOPendingQueue({ orders }: { orders: WFDOOrder[] }) {
     await navigator.clipboard.writeText(buildEmailBody(o))
     setCopied(`body-${o.id}`)
     setTimeout(() => setCopied((prev) => (prev === `body-${o.id}` ? null : prev)), 2000)
+  }
+
+  async function handleApprove(o: WFDOOrder) {
+    const merged = { ...o, ...(edits[o.id] ?? {}) }
+    if (!merged.carrierEmail) {
+      setApproveError((prev) => ({ ...prev, [o.id]: 'Carrier email is required before sending.' }))
+      return
+    }
+    setApproving(o.id)
+    setApproveError((prev) => { const n = { ...prev }; delete n[o.id]; return n })
+    try {
+      const res = await fetch(`/api/wfdo-approve/${encodeURIComponent(o.id)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(merged),
+      })
+      if (!res.ok) throw new Error(`Server error ${res.status}`)
+      window.location.reload()
+    } catch (err) {
+      setApproveError((prev) => ({ ...prev, [o.id]: String(err) }))
+    } finally {
+      setApproving(null)
+    }
+  }
+
+  async function handleReRedact(o: WFDOOrder) {
+    await fetch(`/api/wfdo-re-redact/${encodeURIComponent(o.id)}`, { method: 'POST' })
+    window.location.reload()
   }
 
   async function handleDownloadPdf(o: WFDOOrder) {
@@ -111,6 +141,7 @@ export function WFDOPendingQueue({ orders }: { orders: WFDOOrder[] }) {
                 { label: 'Cargo', key: 'cargoDescription' },
                 { label: 'Packages', key: 'packages' },
                 { label: 'Weight (Kg)', key: 'weightKg' },
+                { label: 'Carrier Email', key: 'carrierEmail' },
               ] as { label: string; key: keyof WFDOOrder }[]
             ).map(({ label, key }) => (
               <div key={key}>
@@ -146,6 +177,26 @@ export function WFDOPendingQueue({ orders }: { orders: WFDOOrder[] }) {
           {/* Action buttons */}
           <div className="flex items-center gap-3 pt-1 flex-wrap">
             <button
+              onClick={() => handleApprove(o)}
+              disabled={approving === o.id}
+              className="text-xs font-medium text-white bg-green-600 rounded-full px-4 py-1.5 hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {approving === o.id ? 'Sending…' : 'Approve & Send'}
+            </button>
+            <button
+              onClick={() => handleReRedact(o)}
+              className="text-xs font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded-full px-4 py-1.5 hover:bg-gray-100 transition-colors"
+            >
+              Re-redact
+            </button>
+            <button
+              onClick={() => handleDownloadPdf(o)}
+              disabled={downloading === o.id}
+              className="text-xs font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded-full px-4 py-1.5 hover:bg-gray-100 transition-colors disabled:opacity-50"
+            >
+              {downloading === o.id ? 'Downloading…' : 'Download PDF'}
+            </button>
+            <button
               onClick={() => handleCopySubject(o)}
               className="text-xs font-medium text-blue-700 bg-blue-50 border border-blue-100 rounded-full px-4 py-1.5 hover:bg-blue-100 transition-colors"
             >
@@ -157,14 +208,10 @@ export function WFDOPendingQueue({ orders }: { orders: WFDOOrder[] }) {
             >
               {copied === `body-${o.id}` ? '✓ Copied!' : 'Copy Body'}
             </button>
-            <button
-              onClick={() => handleDownloadPdf(o)}
-              disabled={downloading === o.id}
-              className="text-xs font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded-full px-4 py-1.5 hover:bg-gray-100 transition-colors disabled:opacity-50"
-            >
-              {downloading === o.id ? 'Downloading…' : 'Download Redacted PDF'}
-            </button>
           </div>
+          {approveError[o.id] && (
+            <p className="text-xs text-red-600 mt-1">{approveError[o.id]}</p>
+          )}
         </div>
       ))}
     </div>

@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3'
 import path from 'path'
 import fs from 'fs'
-import { WFDOOrder } from './types'
+import { WFDOOrder, WF1Batch, WF1Container } from './types'
 
 const DATA_DIR = path.join(process.cwd(), 'data')
 const DB_PATH = path.join(DATA_DIR, 'arl.db')
@@ -18,6 +18,22 @@ function getDb(): Database.Database {
 }
 
 function migrate(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS water_report_batches (
+      id                 TEXT PRIMARY KEY,
+      status             TEXT NOT NULL DEFAULT 'pending_review',
+      received_at        TEXT NOT NULL,
+      sender             TEXT NOT NULL,
+      subject            TEXT,
+      gmail_id           TEXT UNIQUE,
+      source_format      TEXT NOT NULL DEFAULT 'excel',
+      containers         TEXT NOT NULL DEFAULT '[]',
+      container_count    INTEGER NOT NULL DEFAULT 0,
+      reviewed_at        TEXT,
+      sheets_written_at  TEXT
+    );
+  `)
+
   db.exec(`
     CREATE TABLE IF NOT EXISTS delivery_orders (
       id                   TEXT PRIMARY KEY,
@@ -166,5 +182,89 @@ export function getPendingDOOrders(): WFDOOrder[] {
 export function gmailIdExists(gmailId: string): boolean {
   const db = getDb()
   const row = db.prepare('SELECT 1 FROM delivery_orders WHERE gmail_id = ?').get(gmailId)
+  return Boolean(row)
+}
+
+// ---------------------------------------------------------------------------
+// WF1 — Water Report Batches
+// ---------------------------------------------------------------------------
+
+function rowToBatch(row: Record<string, unknown>): WF1Batch {
+  return {
+    id: row.id as string,
+    status: row.status as WF1Batch['status'],
+    receivedAt: row.received_at as string,
+    sender: row.sender as string,
+    subject: (row.subject as string) ?? '',
+    gmailId: (row.gmail_id as string) ?? undefined,
+    sourceFormat: (row.source_format as WF1Batch['sourceFormat']) ?? 'excel',
+    containers: JSON.parse((row.containers as string) ?? '[]') as WF1Container[],
+    containerCount: row.container_count as number,
+    reviewedAt: (row.reviewed_at as string) ?? undefined,
+    sheetsWrittenAt: (row.sheets_written_at as string) ?? undefined,
+  }
+}
+
+export function insertWF1Batch(batch: Omit<WF1Batch, 'containerCount'>): void {
+  const db = getDb()
+  db.prepare(`
+    INSERT OR IGNORE INTO water_report_batches
+      (id, status, received_at, sender, subject, gmail_id, source_format, containers, container_count)
+    VALUES
+      (@id, @status, @receivedAt, @sender, @subject, @gmailId, @sourceFormat, @containers, @containerCount)
+  `).run({
+    id: batch.id,
+    status: batch.status,
+    receivedAt: batch.receivedAt,
+    sender: batch.sender,
+    subject: batch.subject ?? null,
+    gmailId: batch.gmailId ?? null,
+    sourceFormat: batch.sourceFormat,
+    containers: JSON.stringify(batch.containers),
+    containerCount: batch.containers.length,
+  })
+}
+
+export function updateWF1BatchStatus(
+  id: string,
+  status: WF1Batch['status'],
+  extra?: { reviewedAt?: string; sheetsWrittenAt?: string }
+): void {
+  const db = getDb()
+  db.prepare(`
+    UPDATE water_report_batches
+    SET status = @status, reviewed_at = @reviewedAt, sheets_written_at = @sheetsWrittenAt
+    WHERE id = @id
+  `).run({
+    id,
+    status,
+    reviewedAt: extra?.reviewedAt ?? null,
+    sheetsWrittenAt: extra?.sheetsWrittenAt ?? null,
+  })
+}
+
+export function getWF1Batch(id: string): WF1Batch | undefined {
+  const db = getDb()
+  const row = db.prepare('SELECT * FROM water_report_batches WHERE id = ?').get(id) as Record<string, unknown> | undefined
+  return row ? rowToBatch(row) : undefined
+}
+
+export function getPendingWF1Batches(): WF1Batch[] {
+  const db = getDb()
+  const rows = db.prepare(
+    "SELECT * FROM water_report_batches WHERE status = 'pending_review' ORDER BY received_at DESC"
+  ).all() as Record<string, unknown>[]
+  return rows.map(rowToBatch)
+}
+
+export function getAllWF1Batches(): WF1Batch[] {
+  const db = getDb()
+  const rows = db.prepare('SELECT * FROM water_report_batches ORDER BY received_at DESC').all() as Record<string, unknown>[]
+  return rows.map(rowToBatch)
+}
+
+export function wf1GmailIdExists(gmailId: string): boolean {
+  const db = getDb()
+  const row = db.prepare('SELECT 1 FROM water_report_batches WHERE gmail_id = ?').get(gmailId)
   return Boolean(row)
 }

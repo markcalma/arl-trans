@@ -1,6 +1,7 @@
-import { pollNewDOs } from './gmail'
+import { pollNewDOs, pollWaterReportEmails } from './gmail'
 import { parseDOFromPdf } from './claude'
-import { insertDOOrder, gmailIdExists } from './db'
+import { insertDOOrder, gmailIdExists, insertWF1Batch, wf1GmailIdExists } from './db'
+import { parseWaterReportExcel, parseWaterReportText } from './wf1-parser'
 import fs from 'fs'
 import path from 'path'
 import { randomUUID } from 'crypto'
@@ -14,12 +15,14 @@ export function startPoller(): void {
   if (pollerStarted) return
   pollerStarted = true
 
-  console.log('[poller] Started — checking Gmail every 60s')
-  runPoll()
-  setInterval(runPoll, POLL_INTERVAL_MS)
+  console.log('[poller] Started — checking Gmail every 60s (WF-DO + WF1)')
+  runDoPoll()
+  runWF1Poll()
+  setInterval(runDoPoll, POLL_INTERVAL_MS)
+  setInterval(runWF1Poll, POLL_INTERVAL_MS)
 }
 
-async function runPoll(): Promise<void> {
+async function runDoPoll(): Promise<void> {
   if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.ANTHROPIC_API_KEY) {
     return
   }
@@ -88,6 +91,64 @@ async function runPoll(): Promise<void> {
       console.log(`[poller] Ingested DO ${id} (container: ${parsed.containerNumber || 'unknown'})`)
     }
   } catch (err) {
-    console.error('[poller] Error during poll:', err)
+    console.error('[poller] Error during WF-DO poll:', err)
+  }
+}
+
+async function runWF1Poll(): Promise<void> {
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.ANTHROPIC_API_KEY) {
+    return
+  }
+
+  const tokensPath = path.join(process.cwd(), 'google-tokens.json')
+  if (!fs.existsSync(tokensPath)) return
+
+  try {
+    const messages = await pollWaterReportEmails()
+    if (messages.length === 0) return
+    console.log(`[poller/wf1] Found ${messages.length} water report email(s)`)
+
+    for (const msg of messages) {
+      if (wf1GmailIdExists(msg.gmailId)) continue
+
+      const excelAttachment = msg.attachments.find(
+        (a) => a.filename.endsWith('.xlsx') || a.filename.endsWith('.xlsm') || a.filename.endsWith('.xls')
+      )
+
+      let containers
+      let sourceFormat: 'excel' | 'text'
+
+      if (excelAttachment) {
+        containers = parseWaterReportExcel(excelAttachment.data)
+        sourceFormat = 'excel'
+        console.log(`[poller/wf1] Parsed ${containers.length} containers from Excel (${excelAttachment.filename})`)
+      } else if (msg.body) {
+        containers = parseWaterReportText(msg.body)
+        sourceFormat = 'text'
+        console.log(`[poller/wf1] Parsed ${containers.length} containers from email body`)
+      } else {
+        continue
+      }
+
+      if (containers.length === 0) {
+        console.log(`[poller/wf1] No containers parsed from "${msg.subject}" — skipping`)
+        continue
+      }
+
+      insertWF1Batch({
+        id: randomUUID(),
+        status: 'pending_review',
+        receivedAt: msg.receivedAt,
+        sender: msg.sender,
+        subject: msg.subject,
+        gmailId: msg.gmailId,
+        sourceFormat,
+        containers,
+      })
+
+      console.log(`[poller/wf1] Stored batch — ${containers.length} containers from "${msg.subject}"`)
+    }
+  } catch (err) {
+    console.error('[poller/wf1] Error during WF1 poll:', err)
   }
 }

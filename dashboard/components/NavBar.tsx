@@ -10,8 +10,6 @@ export function NavBar() {
 
   const links = [
     { href: '/', label: 'WF1 · Water Report' },
-    { href: '/wf2', label: 'WF2 · Order Intake' },
-    { href: '/wf3', label: 'WF3 · Invoice Review' },
     { href: '/wf-do', label: 'WF-DO · DO Redaction' },
   ]
 

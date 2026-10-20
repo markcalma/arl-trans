@@ -9,7 +9,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "auth": "ts-node --project tsconfig.json scripts/google-auth.ts"
+    "auth": "tsx scripts/google-auth.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",
@@ -18,7 +18,8 @@
     "googleapis": "^186.0.0",
     "next": "16.3.4",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",
@@ -27,9 +28,12 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^18.0.8",
     "eslint": "^9",
     "eslint-config-next": "16.3.4",
     "tailwindcss": "^4",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }

@@ -188,7 +188,7 @@ OAuth tokens are stored in `dashboard/google-tokens.json` (gitignored, generated
 
 At the end of each session, update this section:
 
-**Last worked on:** 2026-10-21 (session 9)
+**Last worked on:** 2026-10-21 (session 10)
 
 **What was done (session 1):** Full Phase 1 rebuild — monorepo created at `C:\Users\28mar\OneDrive\Dev\greg-clarke-arlv2`, GitHub repo at `github.com/markcalma/arl-trans`. All new libs created (db.ts, gmail.ts, sheets.ts, claude.ts, poller.ts). wfdo-approve now sends via Gmail API + writes to Sheets. SQLite replaces flat JSON files. Poller starts on server boot via instrumentation.ts.
 
@@ -254,6 +254,20 @@ At the end of each session, update this section:
 - **Re-sync tested multiple times**: each run caught missed rows from partial earlier writes. Final state: 0 added / 356 updated across all tabs — fully idempotent. ✅
 - TypeScript: 0 errors
 
+**What was done (session 8 — Railway deployment, in progress):**
+- `dashboard/railway.toml`: Switched builder to DOCKERFILE
+- `dashboard/Dockerfile`: Created — node:20-slim, apt build tools, npm ci, rebuild better-sqlite3 from source, npm run build, uses `${PORT:-3000}` for Railway PORT injection
+- `dashboard/.dockerignore`: Added — excludes node_modules, .next, data, .env.local (was causing Windows binaries to overwrite Linux build → segfault)
+- `dashboard/nixpacks.toml`: Added nodejs_20 + build tools (kept for reference but not used now)
+- `dashboard/app/api/health/route.ts`: Health check endpoint
+- `gmail.ts`: TOKENS_PATH moved to data/google-tokens.json; GOOGLE_TOKENS_JSON env var seed
+- Committed and pushed sessions 2-7 to GitHub (were all local)
+- Railway: arl-trans service deployed, volume arl-trans-volume mounted at /app/data, env vars set, domain arl-trans-production.up.railway.app → port 8080
+- Root cause found: `/api/health` was in the auth middleware (`proxy.ts`) and redirected to `/login` — Railway health check got a redirect, never marked service healthy, proxy returned 502
+- Fix: added `/api/health` to PUBLIC routes in `proxy.ts` — pushed as commit `0fbdce1`
+- google-tokens.json refreshed locally (access_token updated) — means local OAuth is working fine
+- Awaiting Railway build of `0fbdce1` to confirm fix. If still failing after this build, next step: check Railway deploy logs for health check response or try the Console tab: `node -e "require('http').get('http://localhost:8080/api/health', r => { let d=''; r.on('data',c=>d+=c); r.on('end',()=>console.log(d)) })"` — should return `{"ok":true}` not `/login`
+
 **What was done (session 7):**
 - `dashboard/railway.toml`: NEW — nixpacks build, `npm run start`, health check at `/api/health`, restart on failure
 - `redact/railway.toml`: NEW — nixpacks build, `uvicorn main:app --host 0.0.0.0 --port $PORT`, health check at `/health`
@@ -301,7 +315,27 @@ At the end of each session, update this section:
 - **Upsert not append** — WF-DO and WF1 each own specific columns in the same row per container. Partial update prevents overwriting each other's data.
 - **Logo stamp is click-to-place** — fixed square (200×200 image pixels = 100×100 PDF points). Click anywhere on PDF canvas to position.
 
+**What was done (session 10):**
+- **Railway deployment abandoned** — better-sqlite3 segfault on first boot (WAL pragma on fresh DB), recurring crash loop, Railway outage blocked final fix. Switched to Hostinger VPS instead.
+- **`proxy.ts` mystery solved** — Next.js 16 recognises `proxy.ts` as middleware (shows as "Proxy (Middleware)" in build output). Auth is working correctly.
+- **Code fixes pushed (commit b630210):**
+  - `lib/db.ts`: wrapped `pragma('journal_mode = WAL')` in try/catch — WAL init segfaults on fresh SQLite DBs in some Linux containers
+  - `instrumentation.ts`: moved `GOOGLE_TOKENS_JSON` seeding to server boot (before poller starts), fixing chicken-and-egg where poller bailed because tokens file didn't exist yet
+- **Hostinger VPS deployment — LIVE at `http://72.62.199.171:3002`:**
+  - Ubuntu 24.04, Node 22.23.3, Python 3.12.3
+  - Upgraded Node 20 → 22 (better-sqlite3 v13 + googleapis require Node ≥ 22)
+  - Python venv at `/opt/redact-venv` with fastapi, uvicorn, pymupdf, python-multipart
+  - Repo cloned to `/opt/arl-trans/`
+  - `.env.local` and `google-tokens.json` deployed to server
+  - Both services managed by PM2, configured to auto-start on reboot
+  - No Nginx yet — accessible directly via IP:port
+
+**Key decisions (session 10):**
+- **Hostinger over Railway** — VPS is better fit: no native module compilation issues, two services on localhost, SQLite as a plain file, full SSH access, no extra cost (VPS already paid for n8n)
+- **No Nginx yet** — team testing on IP:port first; add subdomain + HTTPS once confirmed working
+- **Railway kept as fallback** — commit b630210 (WAL fix + tokens seeding) is pushed and will deploy when Railway builds resume
+
 **Next session:**
-- Test upsert Sheets write with a new real DO email (rows 388+389 deleted from Load Board manually)
-- Phase 3 — Railway deployment (when ready)
+- Add Nginx + SSL for a clean domain (e.g. `arl.yourdomain.com`) — 10 min job
+- Test upsert Sheets write with a new real DO email
 - WF2/WF3 when PortPro API access arrives

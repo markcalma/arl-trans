@@ -3,7 +3,7 @@ import fs from 'fs'
 import path from 'path'
 import { WFDOOrder, WF1Container } from './types'
 
-const TOKENS_PATH = path.join(process.cwd(), 'google-tokens.json')
+const TOKENS_PATH = path.join(process.cwd(), 'data', 'google-tokens.json')
 
 function getAuthClient() {
   const clientId = process.env.GOOGLE_CLIENT_ID
@@ -106,88 +106,142 @@ export async function getSheetHeaders(sheetId: string, tabName: string): Promise
 }
 
 // ---------------------------------------------------------------------------
-// Append to Load Board — tab selected by delivery location
+// Upsert to Load Board — tab selected by delivery location
 //
 // Column order (all location tabs share this structure):
 // A: SSL FREE DAYS  B: SSL  C: VESSEL  D: SIZE  E: Container #
 // F: HOUSE BOL  G: Load #  H: REF #  I: Date DO RECEIVED  J: ETA
 // K: DELIVERY LOCATION  L: TERMINAL  (M–AD filled later by ops team)
+//
+// WF-DO owns: E, F, I, J, K, L — A/B/C/D/G/H are WF1 / ops territory.
+// If the container already exists: partial-update WF-DO columns only.
+// If new: append a full row with WF1 columns left blank.
 // ---------------------------------------------------------------------------
 export async function appendToLoadBoard(order: WFDOOrder): Promise<void> {
   const auth = getAuthClient()
   const sheets = google.sheets({ version: 'v4', auth })
+  const spreadsheetId = getLoadBoardSheetId()
 
   const deliveryLoc = order.consigneeAddress || order.portLocation || ''
   const tab = resolveLoadBoardTab(deliveryLoc)
+  const doDate = order.receivedAt
+    ? new Date(order.receivedAt).toLocaleDateString('en-US')
+    : ''
 
-  const row = [
-    '',                         // A: SSL FREE DAYS
-    order.nvoName || '',        // B: SSL (shipping line / NVO)
-    '',                         // C: VESSEL
-    '',                         // D: SIZE
-    order.containerNumber || '',// E: Container #
-    order.masterBL || '',       // F: HOUSE BOL
-    '',                         // G: Load #
-    '',                         // H: REF #
-    order.receivedAt
-      ? new Date(order.receivedAt).toLocaleDateString('en-US')
-      : '',                     // I: Date DO RECEIVED
-    order.arrivalDate || '',    // J: ETA
-    deliveryLoc,                // K: DELIVERY LOCATION
-    order.portLocation || '',   // L: TERMINAL
-  ]
+  const existingMap = await readColumnIndex(sheets, spreadsheetId, tab, 'E')
+  const existingRow = existingMap.get(order.containerNumber)
 
-  await sheets.spreadsheets.values.append({
-    spreadsheetId: getLoadBoardSheetId(),
-    range: `'${tab}'!A:A`,
-    valueInputOption: 'USER_ENTERED',
-    requestBody: { values: [row] },
-  })
-
-  console.log(`[sheets] Load Board → tab "${tab}", container ${order.containerNumber}`)
+  if (existingRow) {
+    // Partial update — only touch WF-DO-owned columns, leave A/B/C/D alone
+    await sheets.spreadsheets.values.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        valueInputOption: 'USER_ENTERED',
+        data: [
+          { range: `'${tab}'!F${existingRow}`, values: [[order.masterBL || '']] },
+          { range: `'${tab}'!I${existingRow}`, values: [[doDate]] },
+          { range: `'${tab}'!J${existingRow}`, values: [[order.arrivalDate || '']] },
+          { range: `'${tab}'!K${existingRow}`, values: [[deliveryLoc]] },
+          { range: `'${tab}'!L${existingRow}`, values: [[order.portLocation || '']] },
+        ],
+      },
+    })
+    console.log(`[sheets] Load Board → updated row ${existingRow} in "${tab}" for ${order.containerNumber}`)
+  } else {
+    // New container — append full row; leave WF1 columns (A/B/C/D) blank
+    const row = [
+      '',                          // A: SSL FREE DAYS — WF1 fills
+      '',                          // B: SSL — WF1 fills
+      '',                          // C: VESSEL — WF1 fills
+      '',                          // D: SIZE — WF1 fills
+      order.containerNumber || '', // E: Container #
+      order.masterBL || '',        // F: HOUSE BOL
+      '',                          // G: Load #
+      '',                          // H: REF #
+      doDate,                      // I: Date DO RECEIVED
+      order.arrivalDate || '',     // J: ETA
+      deliveryLoc,                 // K: DELIVERY LOCATION
+      order.portLocation || '',    // L: TERMINAL
+    ]
+    await sheets.spreadsheets.values.append({
+      spreadsheetId,
+      range: `'${tab}'!A:A`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [row] },
+    })
+    console.log(`[sheets] Load Board → appended to "${tab}" for ${order.containerNumber}`)
+  }
 }
 
 // ---------------------------------------------------------------------------
-// Append to Master Container List — always "Original" tab
+// Upsert to Master Container List — always "Original" tab
 //
 // Column order:
-// A: date slot ("3-17")  B: Container #  C: Truck Load  D: Custom Ref
+// A: date slot ("3-17")  B: Container #  C: Truck Load  D: Custom Ref (BOL)
 // E: PO Number  F: Pick up (terminal)  G: Size  H: Delivery Location
 // I: Customer  J: Carrier  K: DO Sent to Carrier ("LT M-DD-YY")
 // L: Rate Con  M: Truckmen  N: Consignee  O: ETA to Port / Rail
+//
+// WF-DO owns: A, B, D, H, I, K, N, O — E/G/J are WF1 / ops territory.
+// If the container already exists: partial-update WF-DO columns only.
+// If new: append a full row with WF1 columns left blank.
 // ---------------------------------------------------------------------------
 export async function appendToMasterList(order: WFDOOrder): Promise<void> {
   const auth = getAuthClient()
   const sheets = google.sheets({ version: 'v4', auth })
+  const spreadsheetId = getMasterSheetId()
 
   const ltDate = order.sentAt ? `LT ${formatLTDate(order.sentAt)}` : ''
 
-  const row = [
-    formatShortDate(order.arrivalDate),   // A: date slot
-    order.containerNumber || '',           // B: Container #
-    '',                                    // C: Truck Load
-    order.masterBL || '',                  // D: Custom Ref (BOL)
-    '',                                    // E: PO Number
-    order.portLocation || '',              // F: Pick up (port / terminal)
-    '',                                    // G: Size
-    order.consigneeAddress || '',          // H: Delivery Location
-    order.consignee || '',                 // I: Customer
-    order.nvoName || '',                   // J: Carrier
-    ltDate,                               // K: DO Sent to Carrier ("LT M-DD-YY")
-    '',                                    // L: Rate Con to Carrier
-    '',                                    // M: Truckmen to Carrier
-    order.consignee || '',                 // N: Consignee
-    order.arrivalDate || '',              // O: ETA to Port / Rail
-  ]
+  const existingMap = await readColumnIndex(sheets, spreadsheetId, 'Original', 'B')
+  const existingRow = existingMap.get(order.containerNumber)
 
-  await sheets.spreadsheets.values.append({
-    spreadsheetId: getMasterSheetId(),
-    range: `'Original'!A:A`,
-    valueInputOption: 'USER_ENTERED',
-    requestBody: { values: [row] },
-  })
-
-  console.log(`[sheets] Master Container List → "Original", container ${order.containerNumber}`)
+  if (existingRow) {
+    // Partial update — only touch WF-DO-owned columns, leave E/G/J (WF1) alone
+    await sheets.spreadsheets.values.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        valueInputOption: 'USER_ENTERED',
+        data: [
+          { range: `'Original'!A${existingRow}`, values: [[formatShortDate(order.arrivalDate)]] },
+          { range: `'Original'!D${existingRow}`, values: [[order.masterBL || '']] },
+          { range: `'Original'!F${existingRow}`, values: [[order.portLocation || '']] },
+          { range: `'Original'!H${existingRow}`, values: [[order.consigneeAddress || '']] },
+          { range: `'Original'!I${existingRow}`, values: [[order.consignee || '']] },
+          { range: `'Original'!K${existingRow}`, values: [[ltDate]] },
+          { range: `'Original'!N${existingRow}`, values: [[order.consignee || '']] },
+          { range: `'Original'!O${existingRow}`, values: [[order.arrivalDate || '']] },
+        ],
+      },
+    })
+    console.log(`[sheets] Master List → updated row ${existingRow} in "Original" for ${order.containerNumber}`)
+  } else {
+    // New container — append full row; leave WF1 columns (E/G/J) blank
+    const row = [
+      formatShortDate(order.arrivalDate), // A: date slot
+      order.containerNumber || '',         // B: Container #
+      '',                                  // C: Truck Load — ops fills
+      order.masterBL || '',                // D: Custom Ref (BOL)
+      '',                                  // E: PO Number — WF1 fills
+      order.portLocation || '',            // F: Pick up (terminal)
+      '',                                  // G: Size — WF1 fills
+      order.consigneeAddress || '',        // H: Delivery Location
+      order.consignee || '',               // I: Customer
+      '',                                  // J: Carrier (SSL) — WF1 fills
+      ltDate,                              // K: DO Sent to Carrier
+      '',                                  // L: Rate Con — ops fills
+      '',                                  // M: Truckmen — ops fills
+      order.consignee || '',               // N: Consignee
+      order.arrivalDate || '',             // O: ETA to Port / Rail
+    ]
+    await sheets.spreadsheets.values.append({
+      spreadsheetId,
+      range: `'Original'!A:A`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [row] },
+    })
+    console.log(`[sheets] Master List → appended to "Original" for ${order.containerNumber}`)
+  }
 }
 
 // ---------------------------------------------------------------------------

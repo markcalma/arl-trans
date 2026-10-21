@@ -1,6 +1,5 @@
 import { getAllDOOrders } from '@/lib/db'
-import { WFDOPendingQueue } from '@/components/WFDOPendingQueue'
-import { WFDOSentTable } from '@/components/WFDOSentTable'
+import { WFDOList } from '@/components/WFDOList'
 import { LogoutButton } from '@/components/LogoutButton'
 
 export const dynamic = 'force-dynamic'
@@ -18,8 +17,7 @@ export default async function WFDOPage() {
           </div>
           <LogoutButton />
         </div>
-        <WFDOPendingQueue orders={orders} />
-        <WFDOSentTable orders={orders} />
+        <WFDOList orders={orders} />
       </div>
     </main>
   )

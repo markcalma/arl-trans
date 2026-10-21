@@ -188,7 +188,7 @@ OAuth tokens are stored in `dashboard/google-tokens.json` (gitignored, generated
 
 At the end of each session, update this section:
 
-**Last worked on:** 2026-10-20 (session 7)
+**Last worked on:** 2026-10-21 (session 9)
 
 **What was done (session 1):** Full Phase 1 rebuild — monorepo created at `C:\Users\28mar\OneDrive\Dev\greg-clarke-arlv2`, GitHub repo at `github.com/markcalma/arl-trans`. All new libs created (db.ts, gmail.ts, sheets.ts, claude.ts, poller.ts). wfdo-approve now sends via Gmail API + writes to Sheets. SQLite replaces flat JSON files. Poller starts on server boot via instrumentation.ts.
 
@@ -263,11 +263,45 @@ At the end of each session, update this section:
 - Moved local `google-tokens.json` → `dashboard/data/google-tokens.json` (already gitignored under `dashboard/data/`)
 - TypeScript: 0 errors | Next.js build: clean
 
-**Next session (Phase 3 — Railway Deployment, continued):**
-Railway services are ready to deploy. Steps remaining:
-1. Create Railway project + two services (dashboard, redact) via Railway dashboard
-2. Set each service root directory: `dashboard/` and `redact/`
-3. Add persistent volume on dashboard service → mount at `/app/data`
-4. Set env vars on dashboard service (copy from `.env.local`; set `GOOGLE_TOKENS_JSON` from `data/google-tokens.json` contents; set `REDACT_SERVICE_URL` to redact service's Railway private URL)
-5. Deploy both services (`railway up` or push to GitHub with Railway GitHub integration)
-6. Verify health checks pass and poller starts
+**What was done (session 8):**
+- Fixed 3 bugs discovered during end-to-end testing:
+  - `lib/poller.ts`: Both `runDoPoll()` and `runWF1Poll()` were checking old `google-tokens.json` path (cwd root) instead of new `data/google-tokens.json` — poller silently bailed every 60s without checking Gmail
+  - `lib/sheets.ts`: `TOKENS_PATH` was pointing to old `google-tokens.json` (cwd root) instead of `data/google-tokens.json`
+  - `lib/gmail.ts`: `exchangeCode()` didn't `mkdirSync('data/', {recursive:true})` before writing token file — would fail if `data/` didn't exist
+- **WF-DO end-to-end test passed** (container BMOU5679827):
+  - `GET /api/wfdo-render-page` → PDF rendered as 1224×1584 PNG via Python/PyMuPDF ✅
+  - `POST /api/wfdo-manual-redact` → boxes applied, PDF overwritten in place ✅
+  - `POST /api/wfdo-approve` → Gmail send (to test address) + Load Board append + Master List append, status → 'sent' ✅
+  - `POST /api/wfdo-re-redact` → correctly rejects 'sent' orders (409); resets 'pending_redaction' orders ✅
+- TypeScript: 0 errors (confirmed before and after fixes)
+
+**What was done (session 9):**
+- **WF-DO dashboard full rebuild** (`components/WFDOList.tsx`):
+  - Collapsed rows with sub-status badge ("Awaiting redaction" / "Ready to send" / "Sent")
+  - Click to expand → 3-stage progression: 1·Redact → 2·Review → 3·Send
+  - Stage 1: `WFDORedactEditor` canvas only
+  - Stage 2: PDF preview + editable fields + "Next: Prepare to Send →" button
+  - Stage 3: email draft, Copy Subject/Body, Download PDF, Re-redact, "Mark as Sent" button
+  - "Mark as Sent" replaces "Approve & Send" — no Gmail send, Sheets write only
+- **Deleted** `WFDOPendingQueue.tsx` and `WFDOSentTable.tsx`
+- **Updated** `app/api/wfdo-approve/[id]/route.ts` — removed Gmail send, kept Sheets writes
+- **Reset to original PDF** — poller now saves `{id}.original.pdf` alongside `{id}.pdf`. "Reset to original PDF" link in editor copies it back. New route: `app/api/wfdo-reset-pdf/[id]/route.ts`
+- **ARL-Trans logo stamp** — `components/WFDOLogoStamper.tsx`: click to place fixed square logo on PDF canvas. New Python endpoint `redact/main.py /stamp-logo`. New route: `app/api/wfdo-stamp-logo/[id]/route.ts`. Logo at `dashboard/public/arltrans-no-bg.png`
+- **WFDORedactEditor** — added `onApplied`/`onReset` callbacks, reset button, "Place ARL-Trans logo →" toggle
+- **Sheets upsert for WF-DO** — `appendToLoadBoard` and `appendToMasterList` now upsert:
+  - If container # already exists in sheet → partial update of WF-DO-owned columns only (leaves WF1 columns SSL/size/vessel/free days untouched)
+  - If new → append full row with WF1 columns left blank
+  - Fixed bug: was incorrectly writing `nvoName` to SSL column (Load Board col B) and Carrier column (Master List col J)
+- **`dashboard/scripts/seed-do.ts`** — new script for inserting test DOs into SQLite (`npx tsx scripts/seed-do.ts`)
+- **E2E test passed**: BMOU5679827 — canvas redaction → Apply → logo stamp → Review fields → Mark as Sent → moved to Sent tab ✅
+- TypeScript: 0 errors
+
+**Key decisions (session 9):**
+- **Manual send** — Lorene sends DO email herself from her own Gmail; dashboard only tracks "Mark as Sent" + writes to Sheets
+- **Upsert not append** — WF-DO and WF1 each own specific columns in the same row per container. Partial update prevents overwriting each other's data.
+- **Logo stamp is click-to-place** — fixed square (200×200 image pixels = 100×100 PDF points). Click anywhere on PDF canvas to position.
+
+**Next session:**
+- Test upsert Sheets write with a new real DO email (rows 388+389 deleted from Load Board manually)
+- Phase 3 — Railway deployment (when ready)
+- WF2/WF3 when PortPro API access arrives

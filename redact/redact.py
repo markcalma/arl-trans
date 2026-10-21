@@ -85,6 +85,21 @@ def render_page(pdf_bytes: bytes) -> bytes:
     return pix.tobytes("png")
 
 
+def stamp_logo(pdf_bytes: bytes, box: dict, logo_path: str) -> bytes:
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    page = doc[0]
+    w, h = page.rect.width, page.rect.height
+    scale = 2.0  # canvas coords are in 2× PNG pixel space
+    rect = fitz.Rect(
+        max(0, box["x"] / scale),
+        max(0, box["y"] / scale),
+        min(w, (box["x"] + box["w"]) / scale),
+        min(h, (box["y"] + box["h"]) / scale),
+    )
+    page.insert_image(rect, filename=logo_path)
+    return doc.tobytes()
+
+
 def apply_manual_redactions(pdf_bytes: bytes, boxes: list[dict]) -> bytes:
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     page = doc[0]

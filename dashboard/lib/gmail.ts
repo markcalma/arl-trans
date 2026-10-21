@@ -70,6 +70,7 @@ export async function exchangeCode(code: string): Promise<void> {
   if (!clientId || !clientSecret) throw new Error('GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set')
   const oauth2 = new google.auth.OAuth2(clientId, clientSecret, 'urn:ietf:wg:oauth:2.0:oob')
   const { tokens } = await oauth2.getToken(code)
+  fs.mkdirSync(path.dirname(TOKENS_PATH), { recursive: true })
   fs.writeFileSync(TOKENS_PATH, JSON.stringify(tokens, null, 2))
   console.log('Tokens saved to', TOKENS_PATH)
 }

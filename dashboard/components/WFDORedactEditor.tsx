@@ -1,6 +1,7 @@
 'use client'
 
 import { useRef, useState, useEffect } from 'react'
+import { WFDOLogoStamper } from './WFDOLogoStamper'
 
 interface Box {
   x: number
@@ -19,15 +20,21 @@ interface DrawState {
 export function WFDORedactEditor({
   orderId,
   containerNumber,
+  onApplied,
+  onReset,
 }: {
   orderId: string
   containerNumber: string
+  onApplied?: () => void
+  onReset?: () => void
 }) {
   const [boxes, setBoxes] = useState<Box[]>([])
   const [drawing, setDrawing] = useState<DrawState | null>(null)
   const [imageSize, setImageSize] = useState<{ w: number; h: number } | null>(null)
   const [applying, setApplying] = useState(false)
   const [appliedTs, setAppliedTs] = useState<number | null>(null)
+  const [resetting, setResetting] = useState(false)
+  const [showLogoStamper, setShowLogoStamper] = useState(false)
 
   const imgRef = useRef<HTMLImageElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -120,14 +127,34 @@ export function WFDORedactEditor({
     setApplying(false)
     setBoxes([])
     setAppliedTs(Date.now())
+    onApplied?.()
+  }
+
+  async function handleReset() {
+    setResetting(true)
+    try {
+      const res = await fetch(`/api/wfdo-reset-pdf/${encodeURIComponent(orderId)}`, { method: 'POST' })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        alert(data.error ?? 'Reset failed')
+        return
+      }
+      setAppliedTs(null)
+      setBoxes([])
+      setShowLogoStamper(false)
+      onReset?.()
+    } finally {
+      setResetting(false)
+    }
   }
 
   if (appliedTs) {
     return (
-      <div className="space-y-2">
+      <div className="space-y-3">
         <div className="text-xs text-green-700 bg-green-50 rounded px-3 py-1.5">
-          Redactions applied. Review the PDF below, then approve and send.
+          Redactions applied. Review the PDF below, then proceed to the next step.
         </div>
+
         <div className="rounded overflow-hidden border border-gray-100" style={{ height: 480 }}>
           <iframe
             src={`/api/wfdo-pdf/${encodeURIComponent(orderId)}?t=${appliedTs}`}
@@ -135,12 +162,37 @@ export function WFDORedactEditor({
             title={`Redacted DO for ${containerNumber}`}
           />
         </div>
-        <button
-          onClick={() => setAppliedTs(null)}
-          className="text-xs text-gray-400 underline"
-        >
-          Draw more boxes
-        </button>
+
+        <div className="flex items-center gap-3 flex-wrap">
+          <button
+            onClick={() => { setAppliedTs(null); onReset?.() }}
+            className="text-xs text-gray-400 hover:text-gray-600 underline"
+          >
+            Draw more boxes
+          </button>
+          <button
+            onClick={handleReset}
+            disabled={resetting}
+            className="text-xs text-red-500 hover:text-red-700 underline disabled:opacity-50"
+          >
+            {resetting ? 'Resetting…' : 'Reset to original PDF'}
+          </button>
+          <button
+            onClick={() => setShowLogoStamper(prev => !prev)}
+            className="text-xs font-medium text-blue-700 bg-blue-50 border border-blue-100 rounded-full px-3 py-1 hover:bg-blue-100 transition-colors ml-auto"
+          >
+            {showLogoStamper ? 'Hide logo tool' : 'Place ARL-Trans logo →'}
+          </button>
+        </div>
+
+        {showLogoStamper && (
+          <div className="border-t border-gray-100 pt-3">
+            <WFDOLogoStamper
+              orderId={orderId}
+              onStamped={() => setAppliedTs(Date.now())}
+            />
+          </div>
+        )}
       </div>
     )
   }

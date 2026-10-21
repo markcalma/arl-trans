@@ -1,7 +1,8 @@
 import json
-from fastapi import FastAPI, File, Form, UploadFile, HTTPException
+import os
+from fastapi import FastAPI, File, Form, UploadFile, HTTPException, Request
 from fastapi.responses import Response
-from redact import redact_pdf, render_page, apply_manual_redactions
+from redact import redact_pdf, render_page, apply_manual_redactions, stamp_logo
 
 app = FastAPI()
 
@@ -54,3 +55,31 @@ async def manual_redact_endpoint(
         raise HTTPException(status_code=400, detail="Invalid boxes JSON")
     result_bytes = apply_manual_redactions(pdf_bytes, boxes_list)
     return Response(content=result_bytes, media_type="application/pdf")
+
+
+@app.post("/stamp-logo")
+async def stamp_logo_endpoint(request: Request):
+    data = await request.json()
+    pdf_path = data.get("pdfPath")
+    box = data.get("box")
+
+    if not pdf_path or not box:
+        raise HTTPException(status_code=400, detail="pdfPath and box required")
+    if not os.path.exists(pdf_path):
+        raise HTTPException(status_code=404, detail="PDF not found")
+
+    logo_path = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "dashboard", "public", "arltrans-no-bg.png")
+    )
+    if not os.path.exists(logo_path):
+        raise HTTPException(status_code=404, detail="Logo file not found")
+
+    with open(pdf_path, "rb") as f:
+        pdf_bytes = f.read()
+
+    result_bytes = stamp_logo(pdf_bytes, box, logo_path)
+
+    with open(pdf_path, "wb") as f:
+        f.write(result_bytes)
+
+    return {"ok": True}

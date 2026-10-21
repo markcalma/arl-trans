@@ -27,7 +27,7 @@ async function runDoPoll(): Promise<void> {
     return
   }
 
-  const tokensPath = path.join(process.cwd(), 'google-tokens.json')
+  const tokensPath = path.join(process.cwd(), 'data', 'google-tokens.json')
   if (!fs.existsSync(tokensPath)) return
 
   try {
@@ -52,6 +52,7 @@ async function runDoPoll(): Promise<void> {
       if (pdfAttachment) {
         pdfPath = path.join(PDF_DIR, `${id}.pdf`)
         fs.writeFileSync(pdfPath, pdfAttachment.data)
+        fs.writeFileSync(path.join(PDF_DIR, `${id}.original.pdf`), pdfAttachment.data)
         parsed = await parseDOFromPdf(pdfAttachment.data)
       } else if (xlsxAttachment) {
         // For Excel, we don't render a canvas preview — pass the text to Claude
@@ -100,7 +101,7 @@ async function runWF1Poll(): Promise<void> {
     return
   }
 
-  const tokensPath = path.join(process.cwd(), 'google-tokens.json')
+  const tokensPath = path.join(process.cwd(), 'data', 'google-tokens.json')
   if (!fs.existsSync(tokensPath)) return
 
   try {

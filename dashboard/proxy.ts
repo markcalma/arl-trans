@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 const COOKIE = 'arl-session'
-const PUBLIC = ['/login', '/api/auth/', '/api/wf1-webhook', '/api/wf2-webhook', '/api/wf3-webhook', '/api/wfdo-webhook', '/api/lfd-manual', '/api/email-sent']
+const PUBLIC = ['/login', '/api/auth/', '/api/health', '/api/wf1-webhook', '/api/wf2-webhook', '/api/wf3-webhook', '/api/wfdo-webhook', '/api/lfd-manual', '/api/email-sent']
 
 async function sha256hex(text: string): Promise<string> {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))

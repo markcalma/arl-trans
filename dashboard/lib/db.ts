@@ -12,7 +12,11 @@ function getDb(): Database.Database {
   if (_db) return _db
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true })
   _db = new Database(DB_PATH)
-  _db.pragma('journal_mode = WAL')
+  try {
+    _db.pragma('journal_mode = WAL')
+  } catch {
+    // WAL mode may fail on some Linux container filesystems — default journal is fine
+  }
   migrate(_db)
   return _db
 }

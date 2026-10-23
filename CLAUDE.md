@@ -353,8 +353,22 @@ At the end of each session, update this section:
 - Tests completed: Test 1 ✅ Test 2 ✅ Test 3 ✅ Test 4 ✅ Test 5 ✅
 - Tests pending: Test 6 (multi-container merged PDF — 5 containers), Test 7 (USF Excel DO), Tests 8-10 (WF1)
 
+**What was done (session 12):**
+- **Completed all 10 live tests** (Tests 6-10 finished):
+  - Test 6: Merged PDF → 5 DO records (EMCU8808369, GAOU7282735, TXGU5776680, EGSU9846470, CAAU5879967) ✅
+  - Test 7: USF Excel DO (WHSU5554784) → opens at Review stage, no redact canvas ✅
+  - Test 8: ACR xlsm → 356 containers to Sheets ✅
+  - Test 9: HERE YOU GO (3 xlsx) → 2 batches (EXTON 68, CARSEN 6; STOCKTON empty) ✅
+  - Test 10: Second ACR report → 360 containers to Sheets ✅
+- **Bug fix**: multi-DO merged PDFs — each DO now gets its own PDF copy so redactions are independent. Previously all DOs shared one file (sharedId), now each gets `randomUUID()` + own copy.
+- **Bug fix**: `wfdo-render-page`, `wfdo-manual-redact`, `wfdo-pdf` routes — now look up `pdfPath` from DB (`getDOOrder(safeId)`) instead of constructing `data/pdfs/{id}.pdf`. Fixes 404 for DOs 2-5 in merged PDFs.
+- **Gmail filter**: added `newer_than:7d` to both poller queries (`is:unread has:attachment newer_than:7d` and `is:unread newer_than:7d`). Prevents old unread emails filling the 50-slot limit and blocking new emails.
+- **Gmail maxResults**: increased from 20 → 50 in both pollers.
+- **Gmail debug logs**: added poll count log + silent-skip ID log for diagnostics.
+- **Root cause found (xlsm testing)**: Gmail strips `.xlsm` macro-enabled files when sent Gmail-to-Gmail. In production, xlsm from `podium@oocllogistics.com` arrives from external server — not stripped. Testing workaround: save xlsm → xlsx (File → Save As in Excel), attach xlsx to new email.
+- **Deployed to VPS**: `git push` + manual deploy on `72.62.199.171` (`git pull && npm install && npm run build && pm2 restart all`). All 3 PM2 processes online.
+- **Note**: `/opt/deploy-arl.sh` does not exist on VPS — deploy manually with the 4 commands above.
+
 **Next session:**
-- Continue live tests 5-10 (forward remaining .eml files, verify multi-container and USF Excel DO)
-- Push all changes to GitHub → deploy to VPS via `/opt/deploy-arl.sh`
 - Add Nginx + SSL for a clean domain once team confirms VPS is working
 - WF2/WF3 when PortPro API access arrives

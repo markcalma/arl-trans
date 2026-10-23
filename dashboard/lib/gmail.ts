@@ -322,11 +322,18 @@ export async function pollWaterReportEmails(): Promise<GmailMessage[]> {
       receivedAt,
     })
 
-    await gmail.users.messages.modify({
-      userId: 'me',
-      id: msg.id,
-      requestBody: { removeLabelIds: ['UNREAD'] },
-    })
+    // Only mark as read if email actually has Excel content.
+    // False positives (DO emails misclassified as water reports) are left unread
+    // so the WF-DO poller can still pick them up.
+    if (hasExcel) {
+      await gmail.users.messages.modify({
+        userId: 'me',
+        id: msg.id,
+        requestBody: { removeLabelIds: ['UNREAD'] },
+      })
+    } else {
+      skippedWaterReportIds.add(msg.id)
+    }
   }
 
   return results

@@ -349,6 +349,9 @@ At the end of each session, update this section:
   - Test 3: `9343522I PAC.pdf` (packing list) → correctly rejected after fix ✅
   - Test 4: `Fwd_ HLXU1327279 _ ST2030960.eml` → ingested, PDF canvas rendered ✅
   - Tests 5-10 in progress at checkpoint
+- **WF1 classifier false positive bug found and fixed** (`lib/claude.ts`, `lib/gmail.ts`): WF1 poller was misclassifying DO emails (AMERCAREROYAL subjects) as water reports, marking them as read, causing WF-DO poller to miss them. Fix: tightened WF1 classifier prompt to explicitly reject DOs; only mark email as read when Excel content found (false positives added to skipped set instead)
+- Tests completed: Test 1 ✅ Test 2 ✅ Test 3 ✅ Test 4 ✅ Test 5 ✅
+- Tests pending: Test 6 (multi-container merged PDF — 5 containers), Test 7 (USF Excel DO), Tests 8-10 (WF1)
 
 **Next session:**
 - Continue live tests 5-10 (forward remaining .eml files, verify multi-container and USF Excel DO)

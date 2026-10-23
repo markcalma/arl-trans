@@ -155,7 +155,7 @@ export async function classifyEmailAsWaterReport(subject: string, body: string):
     messages: [
       {
         role: 'user',
-        content: `Is this email a shipping/logistics water report or truck dispatch report (e.g. from Amercare, an ACR Truck Dispatch Report, or similar container arrival schedule)? Reply only "yes" or "no".\n\nSubject: ${subject}\n\nBody: ${body.slice(0, 800)}`,
+        content: `Is this email an Amercare water report or ACR Truck Dispatch Report — a spreadsheet listing multiple containers with ETAs and destinations? Reply only "yes" or "no".\n\nA delivery order (DO), freight release, invoice, or packing list is NOT a water report — answer "no" for those.\n\nSubject: ${subject}\n\nBody: ${body.slice(0, 800)}`,
       },
     ],
   })

@@ -81,12 +81,6 @@ async function runDoPoll(): Promise<void> {
         })
         console.log(`[poller] Ingested Excel DO ${id} (container: ${parsed.containerNumber || 'unknown'})`)
       } else if (pdfAttachment) {
-        // Save one shared PDF file, then create one DO record per container found
-        const sharedId = randomUUID()
-        const sharedPdfPath = path.join(PDF_DIR, `${sharedId}.pdf`)
-        fs.writeFileSync(sharedPdfPath, pdfAttachment.data)
-        fs.writeFileSync(path.join(PDF_DIR, `${sharedId}.original.pdf`), pdfAttachment.data)
-
         const parsedList = await parseAllDOsFromPdf(pdfAttachment.data)
         if (parsedList.length === 0) {
           console.log(`[poller] Claude returned no containers from PDF in "${msg.subject}" — skipping`)
@@ -95,9 +89,12 @@ async function runDoPoll(): Promise<void> {
 
         for (let i = 0; i < parsedList.length; i++) {
           const parsed = parsedList[i]
-          // For multi-container PDFs, each DO gets its own record id but shares the same PDF file.
+          // Each DO gets its own PDF copy so redactions are independent.
           // Only the first record carries the gmailId — enough to prevent re-processing.
-          const id = i === 0 ? sharedId : randomUUID()
+          const id = randomUUID()
+          const pdfPath = path.join(PDF_DIR, `${id}.pdf`)
+          fs.writeFileSync(pdfPath, pdfAttachment.data)
+          fs.writeFileSync(path.join(PDF_DIR, `${id}.original.pdf`), pdfAttachment.data)
           insertDOOrder({
             id,
             status: parsed.confidence === 'low' ? 'needs_manual_review' : 'pending_redaction',
@@ -105,7 +102,7 @@ async function runDoPoll(): Promise<void> {
             sender: msg.sender,
             subject: msg.subject,
             gmailId: i === 0 ? msg.gmailId : undefined,
-            pdfPath: sharedPdfPath,
+            pdfPath,
             containerNumber: parsed.containerNumber,
             masterBL: parsed.masterBL,
             arrivalDate: parsed.arrivalDate,

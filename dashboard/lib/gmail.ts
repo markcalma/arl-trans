@@ -79,18 +79,19 @@ export async function pollNewDOs(): Promise<GmailMessage[]> {
   const auth = getAuthClient()
   const gmail = google.gmail({ version: 'v1', auth })
 
-  // Search all unread emails with attachments — Claude will classify each one
-  const q = 'is:unread has:attachment'
+  // Search recent unread emails with attachments — Claude will classify each one
+  const q = 'is:unread has:attachment newer_than:7d'
 
-  const listRes = await gmail.users.messages.list({ userId: 'me', q, maxResults: 20 })
+  const listRes = await gmail.users.messages.list({ userId: 'me', q, maxResults: 50 })
   const messages = listRes.data.messages ?? []
   if (messages.length === 0) return []
+  console.log(`[gmail] Poll found ${messages.length} unread emails with attachments`)
 
   const results: GmailMessage[] = []
 
   for (const msg of messages) {
     if (!msg.id) continue
-    if (skippedGmailIds.has(msg.id)) continue
+    if (skippedGmailIds.has(msg.id)) { console.log(`[gmail] Silently skipping cached ID ${msg.id}`); continue }
 
     const full = await gmail.users.messages.get({ userId: 'me', id: msg.id, format: 'full' })
     const payload = full.data.payload
@@ -272,15 +273,16 @@ export async function pollWaterReportEmails(): Promise<GmailMessage[]> {
   const auth = getAuthClient()
   const gmail = google.gmail({ version: 'v1', auth })
 
-  const listRes = await gmail.users.messages.list({ userId: 'me', q: 'is:unread', maxResults: 20 })
+  const listRes = await gmail.users.messages.list({ userId: 'me', q: 'is:unread newer_than:7d', maxResults: 50 })
   const messages = listRes.data.messages ?? []
   if (messages.length === 0) return []
+  console.log(`[gmail/wf1] Poll found ${messages.length} unread emails`)
 
   const results: GmailMessage[] = []
 
   for (const msg of messages) {
     if (!msg.id) continue
-    if (skippedWaterReportIds.has(msg.id)) continue
+    if (skippedWaterReportIds.has(msg.id)) { console.log(`[gmail/wf1] Silently skipping cached ID ${msg.id}`); continue }
 
     const full = await gmail.users.messages.get({ userId: 'me', id: msg.id, format: 'full' })
     const payload = full.data.payload

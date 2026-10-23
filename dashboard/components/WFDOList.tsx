@@ -71,8 +71,8 @@ export function WFDOList({ orders }: { orders: WFDOOrder[] }) {
     tab === 'sent'    ? sentOrders :
     orders
 
-  function getStage(id: string): Stage {
-    return stages[id] ?? 'redact'
+  function getStage(id: string, hasPdf: boolean): Stage {
+    return stages[id] ?? (hasPdf ? 'redact' : 'review')
   }
 
   function setStage(id: string, s: Stage) {
@@ -194,7 +194,8 @@ export function WFDOList({ orders }: { orders: WFDOOrder[] }) {
 
       {visible.map((o) => {
         const isExpanded = expandedId === o.id
-        const stage = getStage(o.id)
+        const hasPdf = Boolean(o.pdfPath)
+        const stage = getStage(o.id, hasPdf)
         const pending = isPending(o)
         const sent = isSent(o)
         const subStatus = pending
@@ -259,15 +260,17 @@ export function WFDOList({ orders }: { orders: WFDOOrder[] }) {
                   <>
                     <StageBar stage={stage} />
 
-                    {/* Stage 1 & 2: redact editor — always mounted, hidden only during send */}
-                    <div className={stage === 'send' ? 'hidden' : ''}>
-                      <WFDORedactEditor
-                        orderId={o.id}
-                        containerNumber={o.containerNumber}
-                        onApplied={() => setStage(o.id, 'review')}
-                        onReset={() => setStage(o.id, 'redact')}
-                      />
-                    </div>
+                    {/* Stage 1 & 2: redact editor — only for PDF orders, hidden during send */}
+                    {hasPdf && (
+                      <div className={stage === 'send' ? 'hidden' : ''}>
+                        <WFDORedactEditor
+                          orderId={o.id}
+                          containerNumber={o.containerNumber}
+                          onApplied={() => setStage(o.id, 'review')}
+                          onReset={() => setStage(o.id, 'redact')}
+                        />
+                      </div>
+                    )}
 
                     {/* Stage 2: editable fields */}
                     {stage === 'review' && (
@@ -327,13 +330,15 @@ export function WFDOList({ orders }: { orders: WFDOOrder[] }) {
                         </div>
 
                         <div className="flex items-center gap-2 flex-wrap">
-                          <button
-                            onClick={() => handleDownloadPdf(o)}
-                            disabled={downloading === o.id}
-                            className="text-xs font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded-full px-4 py-1.5 hover:bg-gray-100 transition-colors disabled:opacity-50"
-                          >
-                            {downloading === o.id ? 'Downloading…' : 'Download PDF'}
-                          </button>
+                          {hasPdf && (
+                            <button
+                              onClick={() => handleDownloadPdf(o)}
+                              disabled={downloading === o.id}
+                              className="text-xs font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded-full px-4 py-1.5 hover:bg-gray-100 transition-colors disabled:opacity-50"
+                            >
+                              {downloading === o.id ? 'Downloading…' : 'Download PDF'}
+                            </button>
+                          )}
                           <button
                             onClick={() => handleCopy(`subject-${o.id}`, buildSubject(o))}
                             className="text-xs font-medium text-blue-700 bg-blue-50 border border-blue-100 rounded-full px-4 py-1.5 hover:bg-blue-100 transition-colors"
@@ -346,12 +351,14 @@ export function WFDOList({ orders }: { orders: WFDOOrder[] }) {
                           >
                             {copied === `body-${o.id}` ? '✓ Copied!' : 'Copy Body'}
                           </button>
-                          <button
-                            onClick={() => handleReRedact(o)}
-                            className="text-xs font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-full px-4 py-1.5 hover:bg-gray-100 transition-colors"
-                          >
-                            Re-redact
-                          </button>
+                          {hasPdf && (
+                            <button
+                              onClick={() => handleReRedact(o)}
+                              className="text-xs font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-full px-4 py-1.5 hover:bg-gray-100 transition-colors"
+                            >
+                              Re-redact
+                            </button>
+                          )}
                         </div>
 
                         <div className="flex items-center gap-3 pt-1 border-t border-gray-100">

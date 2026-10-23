@@ -29,9 +29,7 @@ export interface ParsedDO {
 const SYSTEM_PROMPT = `You are a logistics document parser. Extract structured data from delivery order (DO) documents.
 Return ONLY valid JSON matching the requested schema. If a field is not found, return an empty string for that field.`
 
-const EXTRACT_PROMPT = `Extract the following fields from this delivery order document and return as JSON:
-
-{
+const DO_FIELDS = `{
   "containerNumber": "container number (e.g. MSCU1234567)",
   "masterBL": "master bill of lading number",
   "arrivalDate": "arrival/ETA date in MM/DD/YYYY format",
@@ -48,9 +46,21 @@ const EXTRACT_PROMPT = `Extract the following fields from this delivery order do
   "packingListAttached": true or false based on whether a packing list is mentioned,
   "confidence": "high" if most fields found, "medium" if some missing, "low" if very few fields found,
   "notes": "any important notes or warnings about the document"
-}
+}`
+
+const EXTRACT_PROMPT = `Extract the following fields from this delivery order document and return as JSON:
+
+${DO_FIELDS}
 
 Return only the JSON object, no markdown, no explanation.`
+
+const EXTRACT_ALL_PROMPT = `This document may contain one or multiple delivery orders.
+Extract ALL delivery orders and return a JSON array where each element has these fields:
+
+${DO_FIELDS}
+
+If there is only one delivery order, return a single-element array.
+Return only the JSON array, no markdown, no explanation.`
 
 export async function parseDOFromPdf(pdfBytes: Buffer): Promise<ParsedDO> {
   const base64 = pdfBytes.toString('base64')
@@ -81,6 +91,31 @@ export async function parseDOFromPdf(pdfBytes: Buffer): Promise<ParsedDO> {
   return parseJsonResponse(text)
 }
 
+export async function parseAllDOsFromPdf(pdfBytes: Buffer): Promise<ParsedDO[]> {
+  const base64 = pdfBytes.toString('base64')
+
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 4096,
+    system: SYSTEM_PROMPT,
+    messages: [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'document',
+            source: { type: 'base64', media_type: 'application/pdf', data: base64 },
+          },
+          { type: 'text', text: EXTRACT_ALL_PROMPT },
+        ],
+      },
+    ],
+  })
+
+  const text = response.content[0].type === 'text' ? response.content[0].text : ''
+  return parseMultiJsonResponse(text)
+}
+
 export async function parseDOFromText(text: string): Promise<ParsedDO> {
   const response = await client.messages.create({
     model: 'claude-sonnet-4-6',
@@ -105,7 +140,7 @@ export async function classifyEmailAsDO(subject: string, body: string): Promise<
     messages: [
       {
         role: 'user',
-        content: `Does this email contain or reference a delivery order (DO), freight release, or shipping document? Reply only "yes" or "no".\n\nSubject: ${subject}\n\nBody: ${body.slice(0, 800)}`,
+        content: `Is this email a delivery order (DO) or freight release for a shipping container? Reply only "yes" or "no".\n\nA packing list, invoice, receipt, quote, or schedule is NOT a delivery order — answer "no" for those.\n\nSubject: ${subject}\n\nBody: ${body.slice(0, 800)}`,
       },
     ],
   })
@@ -126,6 +161,37 @@ export async function classifyEmailAsWaterReport(subject: string, body: string):
   })
   const text = response.content[0].type === 'text' ? response.content[0].text.toLowerCase().trim() : 'no'
   return text.startsWith('yes')
+}
+
+function parseMultiJsonResponse(text: string): ParsedDO[] {
+  try {
+    const cleaned = text.replace(/^```json\s*/i, '').replace(/\s*```$/, '').trim()
+    const parsed = JSON.parse(cleaned)
+    const arr: unknown[] = Array.isArray(parsed) ? parsed : [parsed]
+    return arr.map((item) => {
+      const p = item as Record<string, unknown>
+      return {
+        containerNumber: String(p.containerNumber ?? ''),
+        masterBL: String(p.masterBL ?? ''),
+        arrivalDate: String(p.arrivalDate ?? ''),
+        consignee: String(p.consignee ?? ''),
+        consigneeAddress: String(p.consigneeAddress ?? ''),
+        cargoDescription: String(p.cargoDescription ?? ''),
+        packages: String(p.packages ?? ''),
+        weightKg: String(p.weightKg ?? ''),
+        weightLb: String(p.weightLb ?? ''),
+        portLocation: String(p.portLocation ?? ''),
+        sealNumber: String(p.sealNumber ?? ''),
+        nvoName: String(p.nvoName ?? ''),
+        carrierEmail: String(p.carrierEmail ?? ''),
+        packingListAttached: Boolean(p.packingListAttached),
+        confidence: (p.confidence as ParsedDO['confidence']) ?? 'low',
+        notes: p.notes as string | undefined,
+      }
+    })
+  } catch {
+    return []
+  }
 }
 
 function parseJsonResponse(text: string): ParsedDO {

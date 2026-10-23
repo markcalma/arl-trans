@@ -188,7 +188,7 @@ OAuth tokens are stored in `dashboard/google-tokens.json` (gitignored, generated
 
 At the end of each session, update this section:
 
-**Last worked on:** 2026-10-21 (session 10)
+**Last worked on:** 2026-10-23 (session 11)
 
 **What was done (session 1):** Full Phase 1 rebuild — monorepo created at `C:\Users\28mar\OneDrive\Dev\greg-clarke-arlv2`, GitHub repo at `github.com/markcalma/arl-trans`. All new libs created (db.ts, gmail.ts, sheets.ts, claude.ts, poller.ts). wfdo-approve now sends via Gmail API + writes to Sheets. SQLite replaces flat JSON files. Poller starts on server boot via instrumentation.ts.
 
@@ -335,7 +335,23 @@ At the end of each session, update this section:
 - **No Nginx yet** — team testing on IP:port first; add subdomain + HTTPS once confirmed working
 - **Railway kept as fallback** — commit b630210 (WAL fix + tokens seeding) is pushed and will deploy when Railway builds resume
 
+**What was done (session 11):**
+- **Gmail multi-account plan saved to memory** — `ops@arl-trans.com` shared inbox approach, forwarding from team members, re-run OAuth when ready
+- **Analysed all sample emails** from `greg-clarke/projects/greg materials/files 9-2-2026` and `eml files 10-5-2026` — found 3 gaps in the automation
+- **Gap 1 fixed** (`lib/poller.ts`): multi-xlsx WF1 emails (e.g. "HERE YOU GO" with 3 xlsx files) now create one batch per xlsx instead of only the first
+- **Gap 2 fixed** (`lib/claude.ts`, `lib/poller.ts`): multi-container merged PDFs now create one DO record per container — new `parseAllDOsFromPdf()` returns array, poller loops through results
+- **Gap 3 fixed** (`lib/excel-do-parser.ts` NEW, `lib/poller.ts`, `components/WFDOList.tsx`): USF Excel DOs (xlsx-only, no PDF) now parsed and stored. UI opens directly at Review stage, no redact canvas, no Download PDF button
+- **Packing list classifier fix** (`lib/claude.ts`): tightened `classifyEmailAsDO` prompt — packing lists, invoices, receipts now correctly rejected
+- **PAC file filter** (`lib/poller.ts`): PDF attachments with " PAC" in filename skipped — prevents packing list PDFs from being ingested as DOs. xlsx takes priority when email has both xlsx + PAC pdf (USF format)
+- **Live tests completed (session 11):**
+  - Test 1: `ONEU5574796 325663.pdf` → ingested ✅, full redact/stamp/approve flow ✅
+  - Test 2: `DO BSIU3095542.pdf` → ingested ✅
+  - Test 3: `9343522I PAC.pdf` (packing list) → correctly rejected after fix ✅
+  - Test 4: `Fwd_ HLXU1327279 _ ST2030960.eml` → ingested, PDF canvas rendered ✅
+  - Tests 5-10 in progress at checkpoint
+
 **Next session:**
-- Add Nginx + SSL for a clean domain (e.g. `arl.yourdomain.com`) — 10 min job
-- Test upsert Sheets write with a new real DO email
+- Continue live tests 5-10 (forward remaining .eml files, verify multi-container and USF Excel DO)
+- Push all changes to GitHub → deploy to VPS via `/opt/deploy-arl.sh`
+- Add Nginx + SSL for a clean domain once team confirms VPS is working
 - WF2/WF3 when PortPro API access arrives

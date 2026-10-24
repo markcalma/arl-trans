@@ -371,8 +371,34 @@ At the end of each session, update this section:
 
 - **Test files consolidated**: all 10 test email files copied and labeled to `C:\Users\28mar\OneDrive\Dev\greg-clarke\projects\greg materials\email for sample testing\` (Test5/NYKU5121534 source file not identified)
 
+**What was done (session 13):**
+- **Canva diagram created**: `diagram.html` at repo root — full process flow diagram (Steps 1-6, orange/green split, forwarding explanation). Open in browser to view/screenshot.
+- **Screen recording script written**: full narration script with [SHOW]/[SAY] cues, email timing (send DO at T=0:00, send water report at T=2:30), all 6 diagram steps integrated.
+- **Blue row highlighting built** (`lib/sheets.ts`): new rows appended to any Sheet tab (WF1 Load Board, WF1 Master List, WF-DO Load Board, WF-DO Master List) are automatically highlighted blue. Updated rows (existing containers) left as-is so Jose's green marks are preserved.
+- **Gmail `category:primary` filter added** (`lib/gmail.ts`): both pollers now query `category:primary` so promotions/social/updates emails don't fill the 50-slot limit and block real DO/water report emails.
+- **arl-redact PM2 fix**: old PM2 config was running uvicorn as Node.js. Fixed by creating `/opt/arl-trans/redact/start.sh` shell wrapper. PM2 now runs bash script instead.
+- **Port 8000 conflict fixed**: orphan uvicorn process was holding port 8000. Fixed with `fuser -k 8000/tcp && pm2 restart arl-redact`.
+- **All changes committed and pushed**: commit `03ef764`.
+
+**Key decisions (session 13):**
+- **No carriers in diagram** — Step 1 correctly shows Freight Forwarders/NVOs (AMERCAREROYAL, USF) sending DOs, not carriers. Carriers receive the redacted DO from ARL-Trans.
+- **Blue highlighting = new rows only** — updated rows are left as-is so Dispatch's green marks survive re-syncs.
+- **Demo email order**: send DO email BEFORE recording starts, send water report at T=2:30 mid-recording while doing redaction flow. Do NOT open emails in Gmail after sending — opening marks them as read and the poller won't find them.
+- **Video demo files**: DO = `Test1 - ONEU5574796 325663.pdf`, Water Report = `Test8 - ACR_Truck_Dispatch_Report_ARL20260806.xlsm` saved as xlsx first (Gmail strips xlsm Gmail-to-Gmail).
+
+**VPS deploy command** (run from `/opt/arl-trans`):
+```bash
+cd /opt/arl-trans && git pull && cd dashboard && npm run build && pm2 restart arl-dashboard
+```
+
+**arl-redact start command** (if it crashes again):
+```bash
+fuser -k 8000/tcp
+pm2 restart arl-redact
+```
+
 **Next session:**
-- Create video presentation + screen recording for team demo (Win+Alt+R to record)
-- Create Canva process diagram (email → ARL-Trans → redact/review → carrier/Sheets)
+- Complete screen recording for team demo — send test emails, do NOT open them in Gmail, wait 60s for dashboard to pick them up
 - Add Nginx + SSL for a clean domain once team confirms VPS is working
+- Set up ops@arl-trans.com shared Gmail inbox when IT confirms
 - WF2/WF3 when PortPro API access arrives

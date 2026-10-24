@@ -369,6 +369,10 @@ At the end of each session, update this section:
 - **Deployed to VPS**: `git push` + manual deploy on `72.62.199.171` (`git pull && npm install && npm run build && pm2 restart all`). All 3 PM2 processes online.
 - **Note**: `/opt/deploy-arl.sh` does not exist on VPS — deploy manually with the 4 commands above.
 
+- **Test files consolidated**: all 10 test email files copied and labeled to `C:\Users\28mar\OneDrive\Dev\greg-clarke\projects\greg materials\email for sample testing\` (Test5/NYKU5121534 source file not identified)
+
 **Next session:**
+- Create video presentation + screen recording for team demo (Win+Alt+R to record)
+- Create Canva process diagram (email → ARL-Trans → redact/review → carrier/Sheets)
 - Add Nginx + SSL for a clean domain once team confirms VPS is working
 - WF2/WF3 when PortPro API access arrives

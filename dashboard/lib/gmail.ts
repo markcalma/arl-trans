@@ -80,7 +80,7 @@ export async function pollNewDOs(): Promise<GmailMessage[]> {
   const gmail = google.gmail({ version: 'v1', auth })
 
   // Search recent unread emails with attachments — Claude will classify each one
-  const q = 'is:unread has:attachment newer_than:7d'
+  const q = 'is:unread has:attachment newer_than:7d category:primary'
 
   const listRes = await gmail.users.messages.list({ userId: 'me', q, maxResults: 50 })
   const messages = listRes.data.messages ?? []
@@ -273,7 +273,7 @@ export async function pollWaterReportEmails(): Promise<GmailMessage[]> {
   const auth = getAuthClient()
   const gmail = google.gmail({ version: 'v1', auth })
 
-  const listRes = await gmail.users.messages.list({ userId: 'me', q: 'is:unread newer_than:7d', maxResults: 50 })
+  const listRes = await gmail.users.messages.list({ userId: 'me', q: 'is:unread newer_than:7d category:primary', maxResults: 50 })
   const messages = listRes.data.messages ?? []
   if (messages.length === 0) return []
   console.log(`[gmail/wf1] Poll found ${messages.length} unread emails`)

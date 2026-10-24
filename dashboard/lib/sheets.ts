@@ -163,12 +163,21 @@ export async function appendToLoadBoard(order: WFDOOrder): Promise<void> {
       deliveryLoc,                 // K: DELIVERY LOCATION
       order.portLocation || '',    // L: TERMINAL
     ]
-    await sheets.spreadsheets.values.append({
+    const appendRes = await sheets.spreadsheets.values.append({
       spreadsheetId,
       range: `'${tab}'!A:A`,
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: [row] },
     })
+    const gids = await getSheetGids(sheets, spreadsheetId)
+    const updatedRange = appendRes.data.updates?.updatedRange
+    const sheetGid = gids.get(tab)
+    if (updatedRange && sheetGid != null) {
+      const rows = parseAppendedRows(updatedRange)
+      if (rows) {
+        try { await highlightRowsBlue(sheets, spreadsheetId, sheetGid, rows.start, rows.end) } catch { /* non-fatal */ }
+      }
+    }
     console.log(`[sheets] Load Board → appended to "${tab}" for ${order.containerNumber}`)
   }
 }
@@ -234,12 +243,21 @@ export async function appendToMasterList(order: WFDOOrder): Promise<void> {
       order.consignee || '',               // N: Consignee
       order.arrivalDate || '',             // O: ETA to Port / Rail
     ]
-    await sheets.spreadsheets.values.append({
+    const appendRes = await sheets.spreadsheets.values.append({
       spreadsheetId,
       range: `'Original'!A:A`,
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: [row] },
     })
+    const gids = await getSheetGids(sheets, spreadsheetId)
+    const updatedRange = appendRes.data.updates?.updatedRange
+    const sheetGid = gids.get('Original')
+    if (updatedRange && sheetGid != null) {
+      const rows = parseAppendedRows(updatedRange)
+      if (rows) {
+        try { await highlightRowsBlue(sheets, spreadsheetId, sheetGid, rows.start, rows.end) } catch { /* non-fatal */ }
+      }
+    }
     console.log(`[sheets] Master List → appended to "Original" for ${order.containerNumber}`)
   }
 }
@@ -282,6 +300,52 @@ function buildMasterListRow(container: WF1Container): string[] {
     '',                                 // N: Consignee
     container.eta || '',                // O: ETA to Port / Rail
   ]
+}
+
+// Get map of tab name → numeric sheetId (needed for formatting requests)
+async function getSheetGids(
+  sheets: ReturnType<typeof google.sheets>,
+  spreadsheetId: string,
+): Promise<Map<string, number>> {
+  const map = new Map<string, number>()
+  try {
+    const res = await sheets.spreadsheets.get({ spreadsheetId, fields: 'sheets.properties' })
+    for (const s of res.data.sheets ?? []) {
+      const title = s.properties?.title
+      const id = s.properties?.sheetId
+      if (title != null && id != null) map.set(title, id)
+    }
+  } catch { /* ignore */ }
+  return map
+}
+
+// Apply blue background highlight to a row range (0-based indices, endRowIndex exclusive)
+async function highlightRowsBlue(
+  sheets: ReturnType<typeof google.sheets>,
+  spreadsheetId: string,
+  sheetId: number,
+  startRowIndex: number,
+  endRowIndex: number,
+): Promise<void> {
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: [{
+        repeatCell: {
+          range: { sheetId, startRowIndex, endRowIndex },
+          cell: { userEnteredFormat: { backgroundColor: { red: 0.565, green: 0.737, blue: 0.953 } } },
+          fields: 'userEnteredFormat.backgroundColor',
+        },
+      }],
+    },
+  })
+}
+
+// Parse the row range returned by sheets.values.append (e.g. "'STOCKTON'!A100:L105")
+function parseAppendedRows(updatedRange: string): { start: number; end: number } | null {
+  const match = updatedRange.match(/[A-Z]+(\d+):[A-Z]+(\d+)$/)
+  if (!match) return null
+  return { start: parseInt(match[1]) - 1, end: parseInt(match[2]) }
 }
 
 // Read a single column from a sheet tab and return a map of value → 1-based row number.
@@ -331,6 +395,7 @@ export async function upsertWF1ContainersToLoadBoard(
   const errors: string[] = []
   const tabs: Record<string, { written: number; updated: number }> = {}
 
+  const gids = await getSheetGids(sheets, spreadsheetId)
   const byTab = new Map<string, WF1Container[]>()
   for (const c of containers) {
     const tab = resolveLoadBoardTab(c.destination)
@@ -365,12 +430,20 @@ export async function upsertWF1ContainersToLoadBoard(
         })
       }
       if (newRows.length > 0) {
-        await sheets.spreadsheets.values.append({
+        const appendRes = await sheets.spreadsheets.values.append({
           spreadsheetId,
           range: `'${tab}'!A:A`,
           valueInputOption: 'USER_ENTERED',
           requestBody: { values: newRows },
         })
+        const updatedRange = appendRes.data.updates?.updatedRange
+        const sheetGid = gids.get(tab)
+        if (updatedRange && sheetGid != null) {
+          const rowRange = parseAppendedRows(updatedRange)
+          if (rowRange) {
+            try { await highlightRowsBlue(sheets, spreadsheetId, sheetGid, rowRange.start, rowRange.end) } catch { /* non-fatal */ }
+          }
+        }
       }
     } catch (err) {
       errors.push(`Load Board "${tab}" batch failed: ${String(err)}`)
@@ -424,12 +497,21 @@ export async function upsertWF1ContainersToMasterList(
       })
     }
     if (newRows.length > 0) {
-      await sheets.spreadsheets.values.append({
+      const appendRes = await sheets.spreadsheets.values.append({
         spreadsheetId,
         range: `'Original'!A:A`,
         valueInputOption: 'USER_ENTERED',
         requestBody: { values: newRows },
       })
+      const gids = await getSheetGids(sheets, spreadsheetId)
+      const updatedRange = appendRes.data.updates?.updatedRange
+      const sheetGid = gids.get('Original')
+      if (updatedRange && sheetGid != null) {
+        const rowRange = parseAppendedRows(updatedRange)
+        if (rowRange) {
+          try { await highlightRowsBlue(sheets, spreadsheetId, sheetGid, rowRange.start, rowRange.end) } catch { /* non-fatal */ }
+        }
+      }
     }
   } catch (err) {
     errors.push(`Master List batch failed: ${String(err)}`)

@@ -83,7 +83,38 @@ async function runDoPoll(): Promise<void> {
       } else if (pdfAttachment) {
         const parsedList = await parseAllDOsFromPdf(pdfAttachment.data)
         if (parsedList.length === 0) {
-          console.log(`[poller] Claude returned no containers from PDF in "${msg.subject}" — skipping`)
+          // Email already marked as read in pollNewDOs — save a stub so it surfaces in dashboard
+          console.log(`[poller] Claude returned no containers from PDF in "${msg.subject}" — saving as needs_manual_review`)
+          const id = randomUUID()
+          const pdfPath = path.join(PDF_DIR, `${id}.pdf`)
+          fs.writeFileSync(pdfPath, pdfAttachment.data)
+          fs.writeFileSync(path.join(PDF_DIR, `${id}.original.pdf`), pdfAttachment.data)
+          insertDOOrder({
+            id,
+            status: 'needs_manual_review',
+            receivedAt: msg.receivedAt,
+            sender: msg.sender,
+            subject: msg.subject,
+            gmailId: msg.gmailId,
+            pdfPath,
+            containerNumber: '',
+            masterBL: '',
+            arrivalDate: '',
+            consignee: '',
+            consigneeAddress: '',
+            cargoDescription: '',
+            packages: '',
+            weightKg: '',
+            weightLb: '',
+            portLocation: '',
+            sealNumber: '',
+            nvoName: '',
+            carrierEmail: '',
+            carrierNotes: '',
+            packingListAttached: false,
+            processedAt: new Date().toISOString(),
+          })
+          console.log(`[poller] Saved stub DO ${id} for manual review`)
           continue
         }
 

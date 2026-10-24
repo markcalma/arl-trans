@@ -114,12 +114,15 @@ export async function pollNewDOs(): Promise<GmailMessage[]> {
     }
 
     const attachments = await extractAttachments(gmail, msg.id, payload)
+    const filenames = attachments.map((a) => a.filename).join(', ')
+    console.log(`[gmail] DO classified: "${subject}" — attachments: ${filenames || '(none)'}`)
 
     const hasRelevantAttachment = attachments.some(
       (a) => a.mimeType === 'application/pdf' || a.filename.endsWith('.xlsx') || a.filename.endsWith('.xls')
     )
     if (!hasRelevantAttachment) {
       skippedGmailIds.add(msg.id)
+      console.log(`[gmail] DO has no PDF/xlsx attachment — skipping`)
       continue
     }
 

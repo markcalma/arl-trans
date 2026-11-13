@@ -59,11 +59,25 @@ function migrate(db: Database.Database): void {
       port_location        TEXT,
       seal_number          TEXT,
       nvo_name             TEXT,
+      customer             TEXT NOT NULL DEFAULT '',
       carrier_email        TEXT,
       carrier_notes        TEXT,
       packing_list_attached INTEGER NOT NULL DEFAULT 0,
       processed_at         TEXT NOT NULL,
       sent_at              TEXT
+    );
+  `)
+  // Add customer column to existing DBs that predate this migration
+  try { db.exec(`ALTER TABLE delivery_orders ADD COLUMN customer TEXT NOT NULL DEFAULT ''`) } catch { /* already exists */ }
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS eta_updates (
+      id           TEXT PRIMARY KEY,
+      gmail_id     TEXT UNIQUE,
+      processed_at TEXT NOT NULL,
+      subject      TEXT,
+      sender       TEXT,
+      updates      TEXT NOT NULL DEFAULT '[]'
     );
   `)
 }
@@ -89,6 +103,7 @@ function rowToOrder(row: Record<string, unknown>): WFDOOrder {
     portLocation: (row.port_location as string) ?? '',
     sealNumber: (row.seal_number as string) ?? '',
     nvoName: (row.nvo_name as string) ?? '',
+    customer: (row.customer as string) ?? '',
     carrierEmail: (row.carrier_email as string) ?? '',
     carrierNotes: (row.carrier_notes as string) ?? '',
     packingListAttached: Boolean(row.packing_list_attached),
@@ -104,13 +119,13 @@ export function insertDOOrder(order: WFDOOrder): void {
       id, status, received_at, sender, subject, gmail_id, pdf_path,
       container_number, master_bl, arrival_date, consignee, consignee_address,
       cargo_description, packages, weight_kg, weight_lb, port_location,
-      seal_number, nvo_name, carrier_email, carrier_notes,
+      seal_number, nvo_name, customer, carrier_email, carrier_notes,
       packing_list_attached, processed_at, sent_at
     ) VALUES (
       @id, @status, @receivedAt, @sender, @subject, @gmailId, @pdfPath,
       @containerNumber, @masterBL, @arrivalDate, @consignee, @consigneeAddress,
       @cargoDescription, @packages, @weightKg, @weightLb, @portLocation,
-      @sealNumber, @nvoName, @carrierEmail, @carrierNotes,
+      @sealNumber, @nvoName, @customer, @carrierEmail, @carrierNotes,
       @packingListAttached, @processedAt, @sentAt
     )
   `).run({
@@ -119,6 +134,7 @@ export function insertDOOrder(order: WFDOOrder): void {
     gmailId: order.gmailId ?? null,
     pdfPath: order.pdfPath ?? null,
     sentAt: order.sentAt ?? null,
+    customer: order.customer ?? '',
   })
 }
 
@@ -142,6 +158,7 @@ export function updateDOOrder(id: string, updates: Partial<WFDOOrder>): void {
       weight_kg = @weightKg,
       weight_lb = @weightLb,
       port_location = @portLocation,
+      customer = @customer,
       sent_at = @sentAt
     WHERE id = @id
   `).run({
@@ -159,6 +176,7 @@ export function updateDOOrder(id: string, updates: Partial<WFDOOrder>): void {
     weightKg: merged.weightKg,
     weightLb: merged.weightLb,
     portLocation: merged.portLocation,
+    customer: merged.customer ?? '',
     sentAt: merged.sentAt ?? null,
   })
 }
@@ -271,4 +289,35 @@ export function wf1GmailIdExists(gmailId: string): boolean {
   const db = getDb()
   const row = db.prepare('SELECT 1 FROM water_report_batches WHERE gmail_id = ?').get(gmailId)
   return Boolean(row)
+}
+
+// ---------------------------------------------------------------------------
+// ETA Updates
+// ---------------------------------------------------------------------------
+
+export function etaUpdateGmailIdExists(gmailId: string): boolean {
+  const db = getDb()
+  const row = db.prepare('SELECT 1 FROM eta_updates WHERE gmail_id = ?').get(gmailId)
+  return Boolean(row)
+}
+
+export function insertETAUpdate(record: {
+  id: string
+  gmailId: string
+  subject: string
+  sender: string
+  updates: import('./claude').ETAUpdate[]
+}): void {
+  const db = getDb()
+  db.prepare(`
+    INSERT OR IGNORE INTO eta_updates (id, gmail_id, processed_at, subject, sender, updates)
+    VALUES (@id, @gmailId, @processedAt, @subject, @sender, @updates)
+  `).run({
+    id: record.id,
+    gmailId: record.gmailId,
+    processedAt: new Date().toISOString(),
+    subject: record.subject,
+    sender: record.sender,
+    updates: JSON.stringify(record.updates),
+  })
 }

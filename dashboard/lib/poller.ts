@@ -1,8 +1,10 @@
-import { pollNewDOs, pollWaterReportEmails } from './gmail'
-import { parseAllDOsFromPdf } from './claude'
-import { insertDOOrder, gmailIdExists, insertWF1Batch, wf1GmailIdExists } from './db'
+import { pollNewDOs, pollWaterReportEmails, pollETAUpdateEmails } from './gmail'
+import { parseAllDOsFromPdf, parseETAUpdateEmail } from './claude'
+import { insertDOOrder, gmailIdExists, insertWF1Batch, wf1GmailIdExists, etaUpdateGmailIdExists, insertETAUpdate } from './db'
 import { parseWaterReportExcel, parseWaterReportText } from './wf1-parser'
 import { parseUSFDeliveryOrderExcel } from './excel-do-parser'
+import { updateWFDOStatus, updateWF1Status, updateETAStatus } from './poller-status'
+import { updateContainerETA } from './sheets'
 import fs from 'fs'
 import path from 'path'
 import { randomUUID } from 'crypto'
@@ -16,24 +18,30 @@ export function startPoller(): void {
   if (pollerStarted) return
   pollerStarted = true
 
-  console.log('[poller] Started — checking Gmail every 60s (WF-DO + WF1)')
+  console.log('[poller] Started — checking Gmail every 60s (WF-DO + WF1 + ETA)')
   runDoPoll()
   runWF1Poll()
+  runETAUpdatePoll()
   setInterval(runDoPoll, POLL_INTERVAL_MS)
   setInterval(runWF1Poll, POLL_INTERVAL_MS)
+  setInterval(runETAUpdatePoll, POLL_INTERVAL_MS)
 }
 
-async function runDoPoll(): Promise<void> {
+export async function runDoPoll(): Promise<{ ingested: number; error: string | null }> {
   if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.ANTHROPIC_API_KEY) {
-    return
+    return { ingested: 0, error: null }
   }
 
   const tokensPath = path.join(process.cwd(), 'data', 'google-tokens.json')
-  if (!fs.existsSync(tokensPath)) return
+  if (!fs.existsSync(tokensPath)) return { ingested: 0, error: null }
 
+  let ingested = 0
   try {
     const messages = await pollNewDOs()
-    if (messages.length === 0) return
+    if (messages.length === 0) {
+      updateWFDOStatus(0, null)
+      return { ingested: 0, error: null }
+    }
     console.log(`[poller] Found ${messages.length} new DO email(s)`)
 
     if (!fs.existsSync(PDF_DIR)) fs.mkdirSync(PDF_DIR, { recursive: true })
@@ -41,9 +49,9 @@ async function runDoPoll(): Promise<void> {
     for (const msg of messages) {
       if (gmailIdExists(msg.gmailId)) continue
 
-      // Skip PAC (packing list) PDFs — they are not delivery orders
+      // Skip PAC / PL (packing list) PDFs — they are not delivery orders
       const pdfAttachment = msg.attachments.find(
-        (a) => a.mimeType === 'application/pdf' && !/ pac[. ]/i.test(a.filename)
+        (a) => a.mimeType === 'application/pdf' && !/ pac[. ]/i.test(a.filename) && !/ pl[. ]/i.test(a.filename)
       )
       const xlsxAttachment = msg.attachments.find(
         (a) => a.filename.endsWith('.xlsx') || a.filename.endsWith('.xls')
@@ -74,12 +82,14 @@ async function runDoPoll(): Promise<void> {
           portLocation: parsed.portLocation,
           sealNumber: parsed.sealNumber,
           nvoName: parsed.nvoName,
+          customer: parsed.customer ?? '',
           carrierEmail: parsed.carrierEmail,
           carrierNotes: '',
           packingListAttached: parsed.packingListAttached,
           processedAt: new Date().toISOString(),
         })
         console.log(`[poller] Ingested Excel DO ${id} (container: ${parsed.containerNumber || 'unknown'})`)
+        ingested++
       } else if (pdfAttachment) {
         const parsedList = await parseAllDOsFromPdf(pdfAttachment.data)
         if (parsedList.length === 0) {
@@ -109,6 +119,7 @@ async function runDoPoll(): Promise<void> {
             portLocation: '',
             sealNumber: '',
             nvoName: '',
+            customer: '',
             carrierEmail: '',
             carrierNotes: '',
             packingListAttached: false,
@@ -146,12 +157,14 @@ async function runDoPoll(): Promise<void> {
             portLocation: parsed.portLocation,
             sealNumber: parsed.sealNumber,
             nvoName: parsed.nvoName,
+            customer: parsed.customer ?? '',
             carrierEmail: parsed.carrierEmail,
             carrierNotes: '',
             packingListAttached: parsed.packingListAttached,
             processedAt: new Date().toISOString(),
           })
           console.log(`[poller] Ingested DO ${id} (container: ${parsed.containerNumber || 'unknown'})`)
+          ingested++
         }
 
         if (parsedList.length > 1) {
@@ -159,22 +172,31 @@ async function runDoPoll(): Promise<void> {
         }
       }
     }
+    updateWFDOStatus(ingested, null)
+    return { ingested, error: null }
   } catch (err) {
+    const error = String(err)
     console.error('[poller] Error during WF-DO poll:', err)
+    updateWFDOStatus(0, error)
+    return { ingested: 0, error }
   }
 }
 
-async function runWF1Poll(): Promise<void> {
+export async function runWF1Poll(): Promise<{ ingested: number; error: string | null }> {
   if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.ANTHROPIC_API_KEY) {
-    return
+    return { ingested: 0, error: null }
   }
 
   const tokensPath = path.join(process.cwd(), 'data', 'google-tokens.json')
-  if (!fs.existsSync(tokensPath)) return
+  if (!fs.existsSync(tokensPath)) return { ingested: 0, error: null }
 
+  let ingested = 0
   try {
     const messages = await pollWaterReportEmails()
-    if (messages.length === 0) return
+    if (messages.length === 0) {
+      updateWF1Status(0, null)
+      return { ingested: 0, error: null }
+    }
     console.log(`[poller/wf1] Found ${messages.length} water report email(s)`)
 
     for (const msg of messages) {
@@ -204,6 +226,7 @@ async function runWF1Poll(): Promise<void> {
             containers,
           })
           console.log(`[poller/wf1] Stored batch — ${containers.length} containers from "${att.filename}"`)
+          ingested++
         }
       } else if (msg.body) {
         const containers = parseWaterReportText(msg.body)
@@ -222,9 +245,63 @@ async function runWF1Poll(): Promise<void> {
           containers,
         })
         console.log(`[poller/wf1] Stored batch — ${containers.length} containers from body`)
+        ingested++
       }
     }
+    updateWF1Status(ingested, null)
+    return { ingested, error: null }
   } catch (err) {
+    const error = String(err)
     console.error('[poller/wf1] Error during WF1 poll:', err)
+    updateWF1Status(0, error)
+    return { ingested: 0, error }
+  }
+}
+
+export async function runETAUpdatePoll(): Promise<{ processed: number; error: string | null }> {
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.ANTHROPIC_API_KEY) {
+    return { processed: 0, error: null }
+  }
+  const tokensPath = path.join(process.cwd(), 'data', 'google-tokens.json')
+  if (!fs.existsSync(tokensPath)) return { processed: 0, error: null }
+
+  let processed = 0
+  try {
+    const messages = await pollETAUpdateEmails()
+    if (messages.length === 0) {
+      updateETAStatus(0, null)
+      return { processed: 0, error: null }
+    }
+    console.log(`[poller/eta] Found ${messages.length} ETA update email(s)`)
+
+    for (const msg of messages) {
+      if (etaUpdateGmailIdExists(msg.gmailId)) continue
+
+      const updates = await parseETAUpdateEmail(msg.subject, msg.body)
+      if (updates.length === 0) {
+        console.log(`[poller/eta] No container updates parsed from "${msg.subject}" — skipping`)
+        continue
+      }
+
+      insertETAUpdate({ id: randomUUID(), gmailId: msg.gmailId, subject: msg.subject, sender: msg.sender, updates })
+
+      for (const update of updates) {
+        if (!update.containerNumber) continue
+        await updateContainerETA(update.containerNumber, {
+          newETA: update.newETA,
+          lastFreeDay: update.lastFreeDay,
+          appointmentDate: update.appointmentDate,
+        })
+        console.log(`[poller/eta] Updated ETA for ${update.containerNumber} from "${msg.subject}"`)
+      }
+      processed++
+    }
+    updateETAStatus(processed, null)
+    return { processed, error: null }
+  } catch (err) {
+    const error = String(err)
+    console.error('[poller/eta] Error during ETA poll:', err)
+    updateETAStatus(0, error)
+    return { processed: 0, error }
   }
 }

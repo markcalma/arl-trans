@@ -27,6 +27,7 @@ export function parseUSFDeliveryOrderExcel(data: Buffer): ParsedDO {
     portLocation: '',
     sealNumber: get(13, 2),
     nvoName: get(1, 0),
+    customer: '',
     carrierEmail: '',
     packingListAttached: false,
     confidence: 'high',

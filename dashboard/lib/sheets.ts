@@ -4,13 +4,14 @@ import path from 'path'
 import { WFDOOrder, WF1Container } from './types'
 
 const TOKENS_PATH = path.join(process.cwd(), 'data', 'google-tokens.json')
+const REDIRECT_URI = process.env.OAUTH_REDIRECT_URI ?? 'http://localhost:3002/api/auth/gmail/callback'
 
 function getAuthClient() {
   const clientId = process.env.GOOGLE_CLIENT_ID
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET
   if (!clientId || !clientSecret) throw new Error('GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set')
 
-  const oauth2 = new google.auth.OAuth2(clientId, clientSecret, 'urn:ietf:wg:oauth:2.0:oob')
+  const oauth2 = new google.auth.OAuth2(clientId, clientSecret, REDIRECT_URI)
 
   if (!fs.existsSync(TOKENS_PATH)) {
     throw new Error('Google tokens not found. Run: npx ts-node scripts/google-auth.ts')
@@ -216,7 +217,7 @@ export async function appendToMasterList(order: WFDOOrder): Promise<void> {
           { range: `'Original'!D${existingRow}`, values: [[order.masterBL || '']] },
           { range: `'Original'!F${existingRow}`, values: [[order.portLocation || '']] },
           { range: `'Original'!H${existingRow}`, values: [[order.consigneeAddress || '']] },
-          { range: `'Original'!I${existingRow}`, values: [[order.consignee || '']] },
+          { range: `'Original'!I${existingRow}`, values: [[order.customer || order.consignee || '']] },
           { range: `'Original'!K${existingRow}`, values: [[ltDate]] },
           { range: `'Original'!N${existingRow}`, values: [[order.consignee || '']] },
           { range: `'Original'!O${existingRow}`, values: [[order.arrivalDate || '']] },
@@ -234,8 +235,8 @@ export async function appendToMasterList(order: WFDOOrder): Promise<void> {
       '',                                  // E: PO Number — WF1 fills
       order.portLocation || '',            // F: Pick up (terminal)
       '',                                  // G: Size — WF1 fills
-      order.consigneeAddress || '',        // H: Delivery Location
-      order.consignee || '',               // I: Customer
+      order.consigneeAddress || '',                      // H: Delivery Location
+      order.customer || order.consignee || '',           // I: Customer (abbreviation from AI)
       '',                                  // J: Carrier (SSL) — WF1 fills
       ltDate,                              // K: DO Sent to Carrier
       '',                                  // L: Rate Con — ops fills
@@ -519,4 +520,74 @@ export async function upsertWF1ContainersToMasterList(
 
   console.log(`[sheets/wf1] Master List "Original": ${written} added, ${updated} updated`)
   return { written, updated, errors, tabs: { Original: { written, updated } } }
+}
+
+// ---------------------------------------------------------------------------
+// ETA Updates — update ETA/LFD/appointment for an existing container
+// Updates MCL "Original" col O (ETA) and Load Board col J (ETA).
+// ---------------------------------------------------------------------------
+export async function updateContainerETA(
+  containerNumber: string,
+  fields: { newETA?: string | null; lastFreeDay?: string | null; appointmentDate?: string | null },
+): Promise<{ mcl: boolean; loadBoard: boolean }> {
+  const auth = getAuthClient()
+  const sheets = google.sheets({ version: 'v4', auth })
+
+  let mclUpdated = false
+  let loadBoardUpdated = false
+
+  // Update MCL "Original"
+  if (fields.newETA) {
+    try {
+      const masterSheetId = getMasterSheetId()
+      const mclIndex = await readColumnIndex(sheets, masterSheetId, 'Original', 'B')
+      const rowNum = mclIndex.get(containerNumber)
+      if (rowNum) {
+        await sheets.spreadsheets.values.batchUpdate({
+          spreadsheetId: masterSheetId,
+          requestBody: {
+            valueInputOption: 'USER_ENTERED',
+            data: [
+              { range: `'Original'!O${rowNum}`, values: [[fields.newETA]] },
+              { range: `'Original'!A${rowNum}`, values: [[formatShortDate(fields.newETA)]] },
+            ],
+          },
+        })
+        mclUpdated = true
+        console.log(`[sheets/eta] MCL updated ETA for ${containerNumber} → ${fields.newETA}`)
+      }
+    } catch (err) {
+      console.error(`[sheets/eta] MCL update failed for ${containerNumber}:`, err)
+    }
+  }
+
+  // Update Load Board — search all tabs
+  if (fields.newETA) {
+    try {
+      const lbSheetId = getLoadBoardSheetId()
+      const lbRes = await sheets.spreadsheets.get({ spreadsheetId: lbSheetId, fields: 'sheets.properties' })
+      const tabs = (lbRes.data.sheets ?? []).map((s) => s.properties?.title).filter(Boolean) as string[]
+
+      for (const tab of tabs) {
+        const idx = await readColumnIndex(sheets, lbSheetId, tab, 'E')
+        const rowNum = idx.get(containerNumber)
+        if (rowNum) {
+          await sheets.spreadsheets.values.batchUpdate({
+            spreadsheetId: lbSheetId,
+            requestBody: {
+              valueInputOption: 'USER_ENTERED',
+              data: [{ range: `'${tab}'!J${rowNum}`, values: [[fields.newETA]] }],
+            },
+          })
+          loadBoardUpdated = true
+          console.log(`[sheets/eta] Load Board "${tab}" updated ETA for ${containerNumber} → ${fields.newETA}`)
+          break
+        }
+      }
+    } catch (err) {
+      console.error(`[sheets/eta] Load Board update failed for ${containerNumber}:`, err)
+    }
+  }
+
+  return { mcl: mclUpdated, loadBoard: loadBoardUpdated }
 }

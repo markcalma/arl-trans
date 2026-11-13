@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { WF1Batch } from '@/lib/types'
+import { ChevronDown, RefreshCw } from 'lucide-react'
 
 type BatchStatus = 'all' | 'pending_review' | 'approved' | 'rejected'
 
@@ -13,9 +14,9 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 const STATUS_COLOR: Record<string, string> = {
-  pending_review: 'bg-yellow-50 text-yellow-700 border-yellow-200',
-  approved: 'bg-green-50 text-green-700 border-green-200',
-  rejected: 'bg-red-50 text-red-700 border-red-200',
+  pending_review: 'bg-yellow-100 text-yellow-800',
+  approved: 'bg-green-100 text-green-800',
+  rejected: 'bg-red-100 text-red-800',
 }
 
 interface TabResult { written: number; updated: number }
@@ -25,6 +26,13 @@ interface ApproveResult {
   errors?: string[]
 }
 
+const FILTER_TABS: { key: BatchStatus; label: string }[] = [
+  { key: 'pending_review', label: 'Pending' },
+  { key: 'approved', label: 'Approved' },
+  { key: 'rejected', label: 'Rejected' },
+  { key: 'all', label: 'All' },
+]
+
 export function WF1BatchList({ initialBatches }: { initialBatches: WF1Batch[] }) {
   const router = useRouter()
   const [filter, setFilter] = useState<BatchStatus>('pending_review')
@@ -33,9 +41,7 @@ export function WF1BatchList({ initialBatches }: { initialBatches: WF1Batch[] })
   const [actionError, setActionError] = useState<string | null>(null)
   const [lastResult, setLastResult] = useState<ApproveResult | null>(null)
 
-  function refresh() {
-    router.refresh()
-  }
+  function refresh() { router.refresh() }
 
   function approve(id: string) {
     setActionError(null)
@@ -86,26 +92,27 @@ export function WF1BatchList({ initialBatches }: { initialBatches: WF1Batch[] })
 
   return (
     <div className="space-y-4">
+      {/* Result banner */}
       {lastResult && !actionError && (
-        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
-          <p className="font-semibold mb-2">Sheets updated</p>
-          <div className="grid grid-cols-2 gap-4">
+        <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.06)] border border-green-100 px-5 py-4">
+          <p className="text-[13px] font-semibold text-green-800 mb-2">Sheets updated successfully</p>
+          <div className="grid grid-cols-2 gap-6">
             <div>
-              <p className="font-medium text-green-900 mb-1">
+              <p className="text-[12px] font-medium text-foreground mb-1">
                 Load Board — {lastResult.loadBoard.written} added, {lastResult.loadBoard.updated} updated
               </p>
               {Object.entries(lastResult.loadBoard.tabs).map(([tab, counts]) => (
-                <p key={tab} className="text-xs text-green-700 pl-2">
+                <p key={tab} className="text-[11px] text-muted pl-2">
                   {tab}: {counts.written} added, {counts.updated} updated
                 </p>
               ))}
             </div>
             <div>
-              <p className="font-medium text-green-900 mb-1">
+              <p className="text-[12px] font-medium text-foreground mb-1">
                 Master List — {lastResult.masterList.written} added, {lastResult.masterList.updated} updated
               </p>
               {Object.entries(lastResult.masterList.tabs).map(([tab, counts]) => (
-                <p key={tab} className="text-xs text-green-700 pl-2">
+                <p key={tab} className="text-[11px] text-muted pl-2">
                   {tab}: {counts.written} added, {counts.updated} updated
                 </p>
               ))}
@@ -114,90 +121,102 @@ export function WF1BatchList({ initialBatches }: { initialBatches: WF1Batch[] })
         </div>
       )}
       {actionError && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          <p className="font-semibold">Write completed with errors</p>
+        <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.06)] border border-red-100 px-5 py-4">
+          <p className="text-[13px] font-semibold text-red-700 mb-1">Write completed with errors</p>
           {lastResult && (
-            <div className="mt-2 grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-6 mb-2">
               <div>
-                <p className="font-medium mb-1">Load Board — {lastResult.loadBoard.written} added, {lastResult.loadBoard.updated} updated</p>
+                <p className="text-[12px] font-medium text-foreground mb-1">Load Board — {lastResult.loadBoard.written} added, {lastResult.loadBoard.updated} updated</p>
                 {Object.entries(lastResult.loadBoard.tabs).map(([tab, counts]) => (
-                  <p key={tab} className="text-xs pl-2">{tab}: {counts.written} added, {counts.updated} updated</p>
+                  <p key={tab} className="text-[11px] text-muted pl-2">{tab}: {counts.written} added, {counts.updated} updated</p>
                 ))}
               </div>
               <div>
-                <p className="font-medium mb-1">Master List — {lastResult.masterList.written} added, {lastResult.masterList.updated} updated</p>
+                <p className="text-[12px] font-medium text-foreground mb-1">Master List — {lastResult.masterList.written} added, {lastResult.masterList.updated} updated</p>
                 {Object.entries(lastResult.masterList.tabs).map(([tab, counts]) => (
-                  <p key={tab} className="text-xs pl-2">{tab}: {counts.written} added, {counts.updated} updated</p>
+                  <p key={tab} className="text-[11px] text-muted pl-2">{tab}: {counts.written} added, {counts.updated} updated</p>
                 ))}
               </div>
             </div>
           )}
-          <p className="mt-2">{actionError}</p>
+          <p className="text-[12px] text-red-600">{actionError}</p>
         </div>
       )}
 
       {/* Filter tabs */}
-      <div className="flex gap-2 border-b border-gray-100 pb-2">
-        {(['pending_review', 'approved', 'rejected', 'all'] as BatchStatus[]).map((s) => (
+      <div className="flex gap-1">
+        {FILTER_TABS.map(({ key, label }) => (
           <button
-            key={s}
-            onClick={() => setFilter(s)}
-            className={`text-sm px-3 py-1 rounded-md transition-colors ${
-              filter === s ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-800'
+            key={key}
+            onClick={() => setFilter(key)}
+            className={`text-[13px] font-medium px-3 py-1.5 rounded-lg transition-colors ${
+              filter === key
+                ? 'bg-gray-900 text-white'
+                : 'text-muted hover:text-foreground hover:bg-white'
             }`}
           >
-            {s === 'all' ? 'All' : STATUS_LABEL[s]}
-            {s !== 'all' && (
-              <span className="ml-1.5 text-xs opacity-70">
-                {initialBatches.filter((b) => b.status === s).length}
+            {label}
+            {key !== 'all' && (
+              <span className={`ml-1.5 text-[11px] ${filter === key ? 'opacity-70' : 'opacity-60'}`}>
+                {initialBatches.filter((b) => b.status === key).length}
               </span>
             )}
           </button>
         ))}
       </div>
 
+      {/* Batch list */}
       {filtered.length === 0 ? (
-        <p className="text-sm text-gray-400 py-8 text-center">No batches to show</p>
+        <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.06)] px-5 py-12 text-center">
+          <p className="text-[14px] text-muted">No batches to show</p>
+        </div>
       ) : (
         filtered.map((batch) => (
-          <div key={batch.id} className="bg-white border border-gray-100 rounded-lg overflow-hidden">
-            {/* Batch header */}
+          <div
+            key={batch.id}
+            className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.06)] overflow-hidden"
+          >
+            {/* Batch header row */}
             <div className="flex items-center gap-4 px-5 py-4">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-medium text-gray-900 truncate">
+                  <span className="text-[14px] font-semibold text-foreground truncate">
                     {batch.subject || '(no subject)'}
                   </span>
-                  <span className={`text-xs border rounded px-1.5 py-0.5 ${STATUS_COLOR[batch.status]}`}>
+                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${STATUS_COLOR[batch.status]}`}>
                     {STATUS_LABEL[batch.status]}
                   </span>
                 </div>
-                <p className="text-xs text-gray-400 mt-0.5">
+                <p className="text-[12px] text-muted mt-0.5">
                   {batch.sender} · {new Date(batch.receivedAt).toLocaleString()} ·{' '}
-                  {batch.containerCount} containers · {batch.sourceFormat}
+                  <span className="font-medium text-foreground">{batch.containerCount} containers</span> · {batch.sourceFormat}
                 </p>
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
                 <button
                   onClick={() => setExpandedId(expandedId === batch.id ? null : batch.id)}
-                  className="text-xs text-gray-500 hover:text-gray-800 px-2 py-1 rounded border border-gray-200 hover:border-gray-300 transition-colors"
+                  className="flex items-center gap-1 text-[12px] font-medium text-muted hover:text-foreground px-2.5 py-1.5 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
                 >
-                  {expandedId === batch.id ? 'Hide' : 'View'} containers
+                  {expandedId === batch.id ? 'Hide' : 'View'}
+                  <ChevronDown
+                    size={13}
+                    className={`transition-transform ${expandedId === batch.id ? 'rotate-180' : ''}`}
+                  />
                 </button>
                 {batch.status === 'pending_review' && (
                   <>
                     <button
                       onClick={() => approve(batch.id)}
                       disabled={isPending}
-                      className="text-xs bg-gray-900 text-white px-3 py-1 rounded hover:bg-gray-700 disabled:opacity-50 transition-colors"
+                      className="text-[12px] font-medium bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
                     >
                       Approve → Sheets
                     </button>
                     <button
                       onClick={() => reject(batch.id)}
                       disabled={isPending}
-                      className="text-xs text-red-600 hover:text-red-800 px-2 py-1 rounded border border-red-200 hover:border-red-300 transition-colors"
+                      className="text-[12px] font-medium text-red-600 hover:text-red-700 px-2.5 py-1.5 rounded-lg border border-red-200 hover:border-red-300 transition-colors"
                     >
                       Reject
                     </button>
@@ -206,15 +225,16 @@ export function WF1BatchList({ initialBatches }: { initialBatches: WF1Batch[] })
                 {batch.status === 'approved' && (
                   <div className="flex items-center gap-2">
                     {batch.sheetsWrittenAt && (
-                      <span className="text-xs text-gray-400">
-                        Written {new Date(batch.sheetsWrittenAt).toLocaleString()}
+                      <span className="text-[11px] text-muted">
+                        {new Date(batch.sheetsWrittenAt).toLocaleString()}
                       </span>
                     )}
                     <button
                       onClick={() => resync(batch.id)}
                       disabled={isPending}
-                      className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded border border-blue-200 hover:border-blue-300 disabled:opacity-50 transition-colors"
+                      className="flex items-center gap-1.5 text-[12px] font-medium text-blue-600 hover:text-blue-700 px-2.5 py-1.5 rounded-lg border border-blue-200 hover:border-blue-300 disabled:opacity-50 transition-colors"
                     >
+                      <RefreshCw size={12} />
                       Re-sync to Sheets
                     </button>
                   </div>
@@ -222,31 +242,31 @@ export function WF1BatchList({ initialBatches }: { initialBatches: WF1Batch[] })
               </div>
             </div>
 
-            {/* Container table (expanded) */}
+            {/* Container table */}
             {expandedId === batch.id && (
-              <div className="border-t border-gray-100 overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead className="bg-gray-50">
-                    <tr>
+              <div className="border-t border-background overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-background">
                       {['Container #', 'Destination', 'ETA', 'SSL', 'Size', 'BL #', 'PO #', 'Free Days', 'Terminal'].map((h) => (
-                        <th key={h} className="text-left px-3 py-2 text-gray-500 font-medium whitespace-nowrap">
+                        <th key={h} className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.5px] text-muted whitespace-nowrap">
                           {h}
                         </th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-50">
+                  <tbody>
                     {batch.containers.map((c, i) => (
-                      <tr key={i} className="hover:bg-gray-50">
-                        <td className="px-3 py-2 font-mono text-gray-900 whitespace-nowrap">{c.containerNumber}</td>
-                        <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{c.destination || '—'}</td>
-                        <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{c.eta || '—'}</td>
-                        <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{c.sslLine || '—'}</td>
-                        <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{c.size || '—'}</td>
-                        <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{c.bl || '—'}</td>
-                        <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{c.po || '—'}</td>
-                        <td className="px-3 py-2 text-gray-600 text-center">{c.freeDays ?? '—'}</td>
-                        <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{c.terminal || '—'}</td>
+                      <tr key={i} className="border-b border-background last:border-0 hover:bg-background">
+                        <td className="px-4 py-2.5 font-mono text-[13px] font-medium text-foreground whitespace-nowrap">{c.containerNumber}</td>
+                        <td className="px-4 py-2.5 text-[13px] text-foreground whitespace-nowrap">{c.destination || '—'}</td>
+                        <td className="px-4 py-2.5 text-[13px] text-foreground whitespace-nowrap">{c.eta || '—'}</td>
+                        <td className="px-4 py-2.5 text-[13px] text-foreground whitespace-nowrap">{c.sslLine || '—'}</td>
+                        <td className="px-4 py-2.5 text-[13px] text-foreground whitespace-nowrap">{c.size || '—'}</td>
+                        <td className="px-4 py-2.5 text-[13px] text-foreground whitespace-nowrap">{c.bl || '—'}</td>
+                        <td className="px-4 py-2.5 text-[13px] text-foreground whitespace-nowrap">{c.po || '—'}</td>
+                        <td className="px-4 py-2.5 text-[13px] text-foreground text-center">{c.freeDays ?? '—'}</td>
+                        <td className="px-4 py-2.5 text-[13px] text-foreground whitespace-nowrap">{c.terminal || '—'}</td>
                       </tr>
                     ))}
                   </tbody>

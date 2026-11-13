@@ -1,9 +1,10 @@
 import { google } from 'googleapis'
 import fs from 'fs'
 import path from 'path'
-import { classifyEmailAsDO, classifyEmailAsWaterReport } from './claude'
+import { classifyEmailAsDO, classifyEmailAsWaterReport, classifyEmailAsETAUpdate } from './claude'
 
 const TOKENS_PATH = path.join(process.cwd(), 'data', 'google-tokens.json')
+const REDIRECT_URI = process.env.OAUTH_REDIRECT_URI ?? 'http://localhost:3002/api/auth/gmail/callback'
 
 // In-memory sets of gmail IDs already classified this session (avoids repeated API calls)
 const skippedGmailIds = new Set<string>()
@@ -35,7 +36,7 @@ function getAuthClient() {
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET
   if (!clientId || !clientSecret) throw new Error('GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set')
 
-  const oauth2 = new google.auth.OAuth2(clientId, clientSecret, 'urn:ietf:wg:oauth:2.0:oob')
+  const oauth2 = new google.auth.OAuth2(clientId, clientSecret, REDIRECT_URI)
 
   // On Railway (or any fresh environment), seed from GOOGLE_TOKENS_JSON env var if present
   if (!fs.existsSync(TOKENS_PATH) && process.env.GOOGLE_TOKENS_JSON) {
@@ -60,7 +61,7 @@ export function getAuthUrl(): string {
   const clientId = process.env.GOOGLE_CLIENT_ID
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET
   if (!clientId || !clientSecret) throw new Error('GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set')
-  const oauth2 = new google.auth.OAuth2(clientId, clientSecret, 'urn:ietf:wg:oauth:2.0:oob')
+  const oauth2 = new google.auth.OAuth2(clientId, clientSecret, REDIRECT_URI)
   return oauth2.generateAuthUrl({ access_type: 'offline', scope: SCOPES, prompt: 'consent' })
 }
 
@@ -68,7 +69,7 @@ export async function exchangeCode(code: string): Promise<void> {
   const clientId = process.env.GOOGLE_CLIENT_ID
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET
   if (!clientId || !clientSecret) throw new Error('GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set')
-  const oauth2 = new google.auth.OAuth2(clientId, clientSecret, 'urn:ietf:wg:oauth:2.0:oob')
+  const oauth2 = new google.auth.OAuth2(clientId, clientSecret, REDIRECT_URI)
   const { tokens } = await oauth2.getToken(code)
   fs.mkdirSync(path.dirname(TOKENS_PATH), { recursive: true })
   fs.writeFileSync(TOKENS_PATH, JSON.stringify(tokens, null, 2))
@@ -339,6 +340,62 @@ export async function pollWaterReportEmails(): Promise<GmailMessage[]> {
     } else {
       skippedWaterReportIds.add(msg.id)
     }
+  }
+
+  return results
+}
+
+// ---------------------------------------------------------------------------
+// Poll for ETA update emails — arrival notices, appointment confirmations,
+// last-free-day notifications. These are text-only emails (no DO attachments).
+// Returns messages classified by Claude as containing container ETA updates.
+// ---------------------------------------------------------------------------
+const skippedETAIds = new Set<string>()
+
+export async function pollETAUpdateEmails(): Promise<GmailMessage[]> {
+  const auth = getAuthClient()
+  const gmail = google.gmail({ version: 'v1', auth })
+
+  // Look at unread emails — same pool as other pollers, but text-only focus
+  const listRes = await gmail.users.messages.list({
+    userId: 'me',
+    q: 'is:unread newer_than:7d category:primary',
+    maxResults: 50,
+  })
+  const messages = listRes.data.messages ?? []
+  if (messages.length === 0) return []
+
+  const results: GmailMessage[] = []
+
+  for (const msg of messages) {
+    if (!msg.id) continue
+    if (skippedETAIds.has(msg.id)) continue
+
+    const full = await gmail.users.messages.get({ userId: 'me', id: msg.id, format: 'full' })
+    const payload = full.data.payload
+    if (!payload) continue
+
+    const headers = payload.headers ?? []
+    const subject = headers.find((h) => h.name?.toLowerCase() === 'subject')?.value ?? ''
+    const from = headers.find((h) => h.name?.toLowerCase() === 'from')?.value ?? ''
+    const dateHeader = headers.find((h) => h.name?.toLowerCase() === 'date')?.value ?? ''
+    const receivedAt = dateHeader ? new Date(dateHeader).toISOString() : new Date().toISOString()
+    const bodyText = extractBodyText(payload)
+
+    const isETA = await classifyEmailAsETAUpdate(subject, bodyText)
+    if (!isETA) {
+      skippedETAIds.add(msg.id)
+      continue
+    }
+
+    console.log(`[gmail/eta] ETA update detected: "${subject}" from ${from}`)
+    results.push({ gmailId: msg.id, sender: from, subject, body: bodyText, attachments: [], receivedAt })
+
+    await gmail.users.messages.modify({
+      userId: 'me',
+      id: msg.id,
+      requestBody: { removeLabelIds: ['UNREAD'] },
+    })
   }
 
   return results

@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ARL-Trans — How It Works</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Inter, sans-serif;
+      background: #EAECEF;
+      padding: 40px 20px;
+      color: #1E2D4E;
+    }
+
+    .diagram {
+      max-width: 960px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 6px 32px rgba(0,0,0,0.12);
+    }
+
+    /* ── Title ── */
+    .title-section {
+      background: #1E2D4E;
+      color: white;
+      text-align: center;
+      padding: 36px 40px 28px;
+    }
+    .title-section h1 { font-size: 30px; font-weight: 700; margin-bottom: 8px; }
+    .title-section p  { font-size: 14px; opacity: 0.75; }
+
+    /* ── Section label ── */
+    .section-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1.8px;
+      text-transform: uppercase;
+      color: #9AA3B2;
+      padding: 22px 40px 10px;
+    }
+
+    /* ── Row wrappers ── */
+    .row       { padding: 0 40px; }
+    .row-pb    { padding: 0 40px 32px; }
+
+    /* ── Arrow ── */
+    .arrow {
+      text-align: center;
+      font-size: 22px;
+      color: #C5CAD4;
+      padding: 10px 0;
+      user-select: none;
+    }
+
+    /* ── Two columns ── */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    /* ── Generic box ── */
+    .box {
+      border-radius: 12px;
+      padding: 22px 24px;
+    }
+    .box .icon  { font-size: 26px; margin-bottom: 10px; }
+    .box h3     { font-size: 15px; font-weight: 700; margin-bottom: 10px; }
+    .box ul     { list-style: none; font-size: 13px; line-height: 1.9; color: #3A4A62; }
+    .box ul li::before { content: "• "; color: #9AA3B2; }
+
+    /* ── Full-width box ── */
+    .full-box { border-radius: 12px; padding: 22px 28px; }
+    .full-box .icon { font-size: 26px; margin-bottom: 10px; }
+    .full-box h3    { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
+    .full-box p     { font-size: 13px; line-height: 1.8; color: #3A4A62; }
+
+    /* ── Color themes ── */
+    .theme-blue   { background: #EBF1FF; }
+    .theme-grey   { background: #F2F4F7; }
+    .theme-navy   { background: #1E2D4E; color: white; }
+    .theme-navy .full-box p { color: rgba(255,255,255,0.75); }
+    .theme-orange { background: #FFF2EA; border-left: 4px solid #E8753A; }
+    .theme-green  { background: #E9F7EF; border-left: 4px solid #2E9E6B; }
+    .theme-orange-lt { background: #FFF7F3; border-left: 4px solid #E8753A; }
+    .theme-green-lt  { background: #F2FBF6; border-left: 4px solid #2E9E6B; }
+
+    /* ── Footer ── */
+    .footer {
+      background: #1E2D4E;
+      color: white;
+      text-align: center;
+      padding: 26px 40px;
+    }
+    .footer h3 { font-size: 15px; font-weight: 600; line-height: 1.6; opacity: 0.95; }
+    .footer .dot { margin: 0 10px; opacity: 0.4; }
+  </style>
+</head>
+<body>
+<div class="diagram">
+
+  <!-- ── Title ── -->
+  <div class="title-section">
+    <h1>How ARL-Trans Works</h1>
+    <p>Automated email processing for Delivery Orders and Water Reports</p>
+  </div>
+
+  <!-- ── Step 1: Who sends emails ── -->
+  <div class="section-label">Step 1 — Who sends the emails</div>
+  <div class="row">
+    <div class="two-col">
+      <div class="box theme-blue">
+        <div class="icon">📄</div>
+        <h3>Freight Forwarders / NVOs</h3>
+        <ul>
+          <li>Send Delivery Order (DO) emails to Lorene</li>
+          <li>e.g. AMERCAREROYAL, USF</li>
+          <li>Attachment: PDF or Excel</li>
+          <li>Nothing changes on their end</li>
+        </ul>
+      </div>
+      <div class="box theme-blue">
+        <div class="icon">📊</div>
+        <h3>Amercare / ACR</h3>
+        <ul>
+          <li>Send Water Report emails to Gary</li>
+          <li>Attachment: Excel file (.xlsx or .xlsm)</li>
+          <li>Nothing changes on their end</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrow">↓</div>
+
+  <!-- ── Step 2: Forwarding ── -->
+  <div class="section-label">Step 2 — Email forwarding</div>
+  <div class="row">
+    <div class="full-box theme-grey">
+      <div class="icon">📬</div>
+      <h3>Auto-Forward to Shared Inbox</h3>
+      <p>
+        Lorene and Gary's emails are automatically forwarded to one shared inbox:
+        <strong>ops@arl-trans.com</strong><br>
+        No manual action needed from the team. Freight forwarders and Amercare keep sending to the same addresses as before.
+      </p>
+    </div>
+  </div>
+
+  <div class="arrow">↓</div>
+
+  <!-- ── Step 3: App reads inbox ── -->
+  <div class="section-label">Step 3 — Automation kicks in</div>
+  <div class="row">
+    <div class="full-box theme-navy">
+      <div class="icon">🤖</div>
+      <h3>ARL-Trans checks the inbox every 60 seconds</h3>
+      <p>Reads new emails, identifies the type, and extracts all the data automatically. No one needs to do anything.</p>
+    </div>
+  </div>
+
+  <div class="arrow">↓&nbsp;&nbsp; splits into two paths &nbsp;&nbsp;↓</div>
+
+  <!-- ── Step 4: Two paths ── -->
+  <div class="section-label">Step 4 — Two types of email</div>
+  <div class="row">
+    <div class="two-col">
+      <div class="box theme-orange">
+        <div class="icon">📄</div>
+        <h3>Delivery Order detected</h3>
+        <ul>
+          <li>Container number</li>
+          <li>Consignee name &amp; address</li>
+          <li>Cargo description</li>
+          <li>Arrival date &amp; terminal</li>
+          <li>Extracted from PDF or Excel automatically</li>
+        </ul>
+      </div>
+      <div class="box theme-green">
+        <div class="icon">📊</div>
+        <h3>Water Report detected</h3>
+        <ul>
+          <li>Full container list parsed from Excel</li>
+          <li>Destination, ETA, free days</li>
+          <li>SSL line &amp; terminal</li>
+          <li>Hundreds of containers processed in seconds</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrow">↓</div>
+
+  <!-- ── Step 5: Team reviews ── -->
+  <div class="section-label">Step 5 — Team reviews in the dashboard</div>
+  <div class="row">
+    <div class="two-col">
+      <div class="box theme-orange-lt">
+        <div class="icon">👩</div>
+        <h3>Lorene opens the DO</h3>
+        <ul>
+          <li>Reviews all extracted fields</li>
+          <li>Draws redaction boxes over sensitive info</li>
+          <li>Stamps the ARL-Trans logo on the PDF</li>
+          <li>Marks as sent when ready</li>
+        </ul>
+      </div>
+      <div class="box theme-green-lt">
+        <div class="icon">👨</div>
+        <h3>Gary opens the batch</h3>
+        <ul>
+          <li>Reviews the full container list</li>
+          <li>Clicks "Approve → Sheets"</li>
+          <li>New rows highlighted blue for Jose (Dispatch)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrow">↓</div>
+
+  <!-- ── Step 6: Result ── -->
+  <div class="section-label">Step 6 — Result</div>
+  <div class="row-pb">
+    <div class="two-col">
+      <div class="box theme-orange-lt">
+        <div class="icon">📧</div>
+        <h3>Redacted DO sent to carrier</h3>
+        <ul>
+          <li>Lorene sends the redacted PDF to the carrier/driver dispatched to pick up the container</li>
+          <li>Consignee info removed — carrier only sees what they need</li>
+          <li>ARL-Trans logo stamped on the document</li>
+          <li>Google Sheets updated automatically</li>
+        </ul>
+      </div>
+      <div class="box theme-green-lt">
+        <div class="icon">📊</div>
+        <h3>Google Sheets updated</h3>
+        <ul>
+          <li>All containers written to Load Board</li>
+          <li>Master Container List updated</li>
+          <li>New rows highlighted blue for Jose (Dispatch)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Footer ── -->
+  <div class="footer">
+    <h3>
+      ✅ Zero manual data entry
+      <span class="dot">·</span>
+      No missed emails
+      <span class="dot">·</span>
+      Google Sheets always up to date
+    </h3>
+  </div>
+
+</div>
+</body>
+</html>

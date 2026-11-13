@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { ChevronDown } from 'lucide-react'
 import { WFDOOrder } from '@/lib/types'
 import { WFDORedactEditor } from './WFDORedactEditor'
 
@@ -15,17 +16,6 @@ function isSent(o: WFDOOrder) {
   return o.status === 'sent'
 }
 
-function Chevron({ expanded }: { expanded: boolean }) {
-  return (
-    <svg
-      className={`w-4 h-4 text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`}
-      fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-    </svg>
-  )
-}
-
 function StageBar({ stage }: { stage: Stage }) {
   const steps: { key: Stage; label: string }[] = [
     { key: 'redact', label: 'Redact' },
@@ -35,18 +25,18 @@ function StageBar({ stage }: { stage: Stage }) {
   const activeIdx = steps.findIndex((s) => s.key === stage)
 
   return (
-    <div className="flex items-center gap-1 text-xs select-none">
+    <div className="flex items-center gap-1 select-none">
       {steps.map((s, i) => (
         <span key={s.key} className="flex items-center gap-1">
-          <span className={`px-3 py-1 rounded-full font-medium transition-colors ${
-            i < activeIdx  ? 'text-gray-400' :
+          <span className={`text-[12px] font-medium px-3 py-1 rounded-full transition-colors ${
+            i < activeIdx  ? 'text-muted' :
             i === activeIdx ? 'bg-gray-900 text-white' :
             'text-gray-300'
           }`}>
             {i + 1} · {s.label}
           </span>
           {i < steps.length - 1 && (
-            <span className={i < activeIdx ? 'text-gray-400' : 'text-gray-200'}>→</span>
+            <span className={`text-[12px] ${i < activeIdx ? 'text-muted' : 'text-gray-200'}`}>→</span>
           )}
         </span>
       ))}
@@ -164,7 +154,7 @@ export function WFDOList({ orders }: { orders: WFDOOrder[] }) {
     setTimeout(() => setCopied((prev) => (prev === key ? null : prev)), 2000)
   }
 
-  const tabs: { key: Tab; label: string; count: number }[] = [
+  const tabDefs: { key: Tab; label: string; count: number }[] = [
     { key: 'pending', label: 'Pending', count: pendingOrders.length },
     { key: 'sent',    label: 'Sent',    count: sentOrders.length },
     { key: 'all',     label: 'All',     count: orders.length },
@@ -173,23 +163,25 @@ export function WFDOList({ orders }: { orders: WFDOOrder[] }) {
   return (
     <div className="space-y-3">
       {/* Tab bar */}
-      <div className="flex gap-2 border-b border-gray-100 pb-2">
-        {tabs.map(({ key, label, count }) => (
+      <div className="flex gap-1">
+        {tabDefs.map(({ key, label, count }) => (
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={`text-sm px-3 py-1 rounded-md transition-colors ${
-              tab === key ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-800'
+            className={`text-[13px] font-medium px-3 py-1.5 rounded-lg transition-colors ${
+              tab === key ? 'bg-gray-900 text-white' : 'text-muted hover:text-foreground hover:bg-white'
             }`}
           >
             {label}
-            <span className="ml-1.5 text-xs opacity-70">{count}</span>
+            <span className="ml-1.5 text-[11px] opacity-70">{count}</span>
           </button>
         ))}
       </div>
 
       {visible.length === 0 && (
-        <p className="text-sm text-gray-400 py-8 text-center">No delivery orders to show.</p>
+        <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.06)] px-5 py-12 text-center">
+          <p className="text-[14px] text-muted">No delivery orders to show.</p>
+        </div>
       )}
 
       {visible.map((o) => {
@@ -205,52 +197,55 @@ export function WFDOList({ orders }: { orders: WFDOOrder[] }) {
         return (
           <div
             key={o.id}
-            className={`bg-white rounded-xl shadow-sm overflow-hidden ${
+            className={`bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.06)] overflow-hidden ${
               o.status === 'needs_manual_review' ? 'ring-1 ring-amber-200' : ''
             }`}
           >
             {/* Collapsed row */}
             <button
               onClick={() => toggleExpand(o.id)}
-              className="w-full px-5 py-4 flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
+              className="w-full px-5 py-4 flex items-center justify-between text-left hover:bg-background transition-colors"
             >
               <div className="flex items-center gap-3 min-w-0 flex-1">
-                <span className="font-mono text-sm font-semibold text-gray-900 shrink-0">
+                <span className="font-mono text-[13px] font-semibold text-foreground shrink-0">
                   {o.containerNumber || '(no #)'}
                 </span>
-                <span className="text-sm text-gray-600 truncate">{o.consignee || '—'}</span>
-                <span className="text-xs text-gray-400 shrink-0 hidden sm:block">{o.portLocation || '—'}</span>
+                <span className="text-[13px] text-foreground truncate">{o.consignee || '—'}</span>
+                <span className="text-[12px] text-muted shrink-0 hidden sm:block">{o.portLocation || '—'}</span>
               </div>
               <div className="flex items-center gap-2 shrink-0 ml-4">
                 {subStatus && (
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                  <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${
                     subStatus === 'Ready to send'
-                      ? 'bg-green-50 text-green-700'
-                      : 'bg-amber-50 text-amber-700'
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-yellow-100 text-yellow-800'
                   }`}>
                     {subStatus}
                   </span>
                 )}
                 {sent && (
-                  <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
+                  <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
                     Sent
                   </span>
                 )}
-                <span className="text-xs text-gray-400">{new Date(o.receivedAt).toLocaleDateString()}</span>
-                <Chevron expanded={isExpanded} />
+                <span className="text-[12px] text-muted">{new Date(o.receivedAt).toLocaleDateString()}</span>
+                <ChevronDown
+                  size={16}
+                  className={`text-muted transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                />
               </div>
             </button>
 
             {/* Expanded content */}
             {isExpanded && (
-              <div className="border-t border-gray-100 px-5 py-4 space-y-4">
+              <div className="border-t border-background px-5 py-4 space-y-4">
                 {/* Meta */}
-                <p className="text-xs text-gray-400">
+                <p className="text-[12px] text-muted">
                   From: {o.sender} · {new Date(o.receivedAt).toLocaleString()} · {o.subject}
                 </p>
 
                 {o.status === 'needs_manual_review' && (
-                  <div className="text-xs text-amber-700 bg-amber-50 rounded px-3 py-1.5">
+                  <div className="text-[12px] text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
                     AI could not detect text in this PDF. Please review fields manually before marking as sent.
                   </div>
                 )}
@@ -275,7 +270,7 @@ export function WFDOList({ orders }: { orders: WFDOOrder[] }) {
                     {/* Stage 2: editable fields */}
                     {stage === 'review' && (
                       <>
-                        <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div className="grid grid-cols-2 gap-3">
                           {(
                             [
                               { label: 'Container #',     key: 'containerNumber' },
@@ -283,6 +278,7 @@ export function WFDOList({ orders }: { orders: WFDOOrder[] }) {
                               { label: 'Arrival Date',    key: 'arrivalDate' },
                               { label: 'Port / Location', key: 'portLocation' },
                               { label: 'Consignee',       key: 'consignee' },
+                              { label: 'Customer',        key: 'customer' },
                               { label: 'Cargo',           key: 'cargoDescription' },
                               { label: 'Packages',        key: 'packages' },
                               { label: 'Weight (Kg)',     key: 'weightKg' },
@@ -290,29 +286,29 @@ export function WFDOList({ orders }: { orders: WFDOOrder[] }) {
                             ] as { label: string; key: keyof WFDOOrder }[]
                           ).map(({ label, key }) => (
                             <div key={key}>
-                              <label className="text-xs text-gray-400 block mb-0.5">{label}</label>
+                              <label className="text-[11px] font-medium text-muted block mb-1">{label}</label>
                               <input
                                 type="text"
                                 value={String(getField(o, key) ?? '')}
                                 onChange={(e) => setField(o.id, key, e.target.value)}
-                                className="w-full border border-gray-200 rounded px-2 py-1 text-sm text-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-300"
+                                className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-[13px] text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-colors"
                               />
                             </div>
                           ))}
                           <div className="col-span-2">
-                            <label className="text-xs text-gray-400 block mb-0.5">Notes to Carrier (optional)</label>
+                            <label className="text-[11px] font-medium text-muted block mb-1">Notes to Carrier (optional)</label>
                             <textarea
                               value={String(getField(o, 'carrierNotes') ?? '')}
                               onChange={(e) => setField(o.id, 'carrierNotes', e.target.value)}
                               rows={2}
-                              className="w-full border border-gray-200 rounded px-2 py-1 text-sm text-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-300"
+                              className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-[13px] text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-colors"
                             />
                           </div>
                         </div>
                         <div className="flex justify-end pt-1">
                           <button
                             onClick={() => setStage(o.id, 'send')}
-                            className="text-xs font-medium text-white bg-gray-900 rounded-full px-4 py-1.5 hover:bg-gray-700 transition-colors"
+                            className="text-[12px] font-medium text-white bg-blue-600 rounded-full px-4 py-1.5 hover:bg-blue-700 transition-colors"
                           >
                             Next: Prepare to Send →
                           </button>
@@ -323,10 +319,10 @@ export function WFDOList({ orders }: { orders: WFDOOrder[] }) {
                     {/* Stage 3: send panel */}
                     {stage === 'send' && (
                       <>
-                        <div className="rounded-lg border border-gray-100 bg-gray-50 p-3 text-xs text-gray-700 space-y-1">
-                          <p className="font-medium text-gray-500 uppercase tracking-wide text-[10px] mb-1">Email draft</p>
-                          <p className="font-medium">Subject: {buildSubject(o)}</p>
-                          <pre className="whitespace-pre-wrap font-sans leading-relaxed text-gray-600">{buildBody(o)}</pre>
+                        <div className="rounded-xl border border-background bg-background p-4 text-[12px] text-foreground space-y-1">
+                          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted mb-2">Email draft</p>
+                          <p className="font-semibold">Subject: {buildSubject(o)}</p>
+                          <pre className="whitespace-pre-wrap font-sans leading-relaxed text-muted mt-2">{buildBody(o)}</pre>
                         </div>
 
                         <div className="flex items-center gap-2 flex-wrap">
@@ -334,51 +330,51 @@ export function WFDOList({ orders }: { orders: WFDOOrder[] }) {
                             <button
                               onClick={() => handleDownloadPdf(o)}
                               disabled={downloading === o.id}
-                              className="text-xs font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded-full px-4 py-1.5 hover:bg-gray-100 transition-colors disabled:opacity-50"
+                              className="text-[12px] font-medium text-foreground bg-white border border-gray-200 rounded-full px-4 py-1.5 hover:bg-background transition-colors disabled:opacity-50"
                             >
                               {downloading === o.id ? 'Downloading…' : 'Download PDF'}
                             </button>
                           )}
                           <button
                             onClick={() => handleCopy(`subject-${o.id}`, buildSubject(o))}
-                            className="text-xs font-medium text-blue-700 bg-blue-50 border border-blue-100 rounded-full px-4 py-1.5 hover:bg-blue-100 transition-colors"
+                            className="text-[12px] font-medium text-blue-700 bg-blue-50 border border-blue-100 rounded-full px-4 py-1.5 hover:bg-blue-100 transition-colors"
                           >
                             {copied === `subject-${o.id}` ? '✓ Copied!' : 'Copy Subject'}
                           </button>
                           <button
                             onClick={() => handleCopy(`body-${o.id}`, buildBody(o))}
-                            className="text-xs font-medium text-blue-700 bg-blue-50 border border-blue-100 rounded-full px-4 py-1.5 hover:bg-blue-100 transition-colors"
+                            className="text-[12px] font-medium text-blue-700 bg-blue-50 border border-blue-100 rounded-full px-4 py-1.5 hover:bg-blue-100 transition-colors"
                           >
                             {copied === `body-${o.id}` ? '✓ Copied!' : 'Copy Body'}
                           </button>
                           {hasPdf && (
                             <button
                               onClick={() => handleReRedact(o)}
-                              className="text-xs font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-full px-4 py-1.5 hover:bg-gray-100 transition-colors"
+                              className="text-[12px] font-medium text-muted bg-white border border-gray-200 rounded-full px-4 py-1.5 hover:bg-background transition-colors"
                             >
                               Re-redact
                             </button>
                           )}
                         </div>
 
-                        <div className="flex items-center gap-3 pt-1 border-t border-gray-100">
+                        <div className="flex items-center gap-3 pt-2 border-t border-background">
                           <button
                             onClick={() => setStage(o.id, 'review')}
-                            className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                            className="text-[12px] text-muted hover:text-foreground transition-colors"
                           >
                             ← Back to Review
                           </button>
                           <button
                             onClick={() => handleMarkSent(o)}
                             disabled={markingId === o.id}
-                            className="text-xs font-medium text-white bg-green-600 rounded-full px-5 py-1.5 hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ml-auto"
+                            className="text-[12px] font-medium text-white bg-green-600 rounded-full px-5 py-1.5 hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ml-auto"
                           >
                             {markingId === o.id ? 'Saving…' : 'Mark as Sent'}
                           </button>
                         </div>
 
                         {markError[o.id] && (
-                          <p className="text-xs text-red-600">{markError[o.id]}</p>
+                          <p className="text-[12px] text-red-600">{markError[o.id]}</p>
                         )}
                       </>
                     )}
@@ -387,26 +383,23 @@ export function WFDOList({ orders }: { orders: WFDOOrder[] }) {
 
                 {/* ── Sent: read-only summary ── */}
                 {sent && (
-                  <div className="grid grid-cols-2 gap-y-3 text-sm">
-                    <div>
-                      <p className="text-xs text-gray-400">Consignee</p>
-                      <p className="text-gray-700">{o.consignee || '—'}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-400">Master BL</p>
-                      <p className="text-gray-700">{o.masterBL || '—'}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-400">Port / Location</p>
-                      <p className="text-gray-700">{o.portLocation || '—'}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-400">Carrier Email</p>
-                      <p className="text-gray-700">{o.carrierEmail || '—'}</p>
-                    </div>
+                  <div className="grid grid-cols-2 gap-y-3">
+                    {[
+                      { label: 'Consignee',      value: o.consignee },
+                      { label: 'Master BL',      value: o.masterBL },
+                      { label: 'Port / Location',value: o.portLocation },
+                      { label: 'Carrier Email',  value: o.carrierEmail },
+                    ].map(({ label, value }) => (
+                      <div key={label}>
+                        <p className="text-[11px] font-medium text-muted">{label}</p>
+                        <p className="text-[13px] text-foreground mt-0.5">{value || '—'}</p>
+                      </div>
+                    ))}
                     <div className="col-span-2">
-                      <p className="text-xs text-gray-400">Marked Sent</p>
-                      <p className="text-gray-700">{o.sentAt ? new Date(o.sentAt).toLocaleString() : '—'}</p>
+                      <p className="text-[11px] font-medium text-muted">Marked Sent</p>
+                      <p className="text-[13px] text-foreground mt-0.5">
+                        {o.sentAt ? new Date(o.sentAt).toLocaleString() : '—'}
+                      </p>
                     </div>
                   </div>
                 )}

@@ -128,6 +128,7 @@ export interface WFDOOrder {
   portLocation: string
   sealNumber: string
   nvoName: string
+  customer: string
   carrierEmail: string
   carrierNotes: string
   packingListAttached: boolean

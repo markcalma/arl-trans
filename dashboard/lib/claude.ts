@@ -20,10 +20,18 @@ export interface ParsedDO {
   portLocation: string
   sealNumber: string
   nvoName: string
+  customer: string
   carrierEmail: string
   packingListAttached: boolean
   confidence: 'high' | 'medium' | 'low'
   notes?: string
+}
+
+export interface ETAUpdate {
+  containerNumber: string
+  newETA: string | null
+  lastFreeDay: string | null
+  appointmentDate: string | null
 }
 
 const SYSTEM_PROMPT = `You are a logistics document parser. Extract structured data from delivery order (DO) documents.
@@ -42,6 +50,7 @@ const DO_FIELDS = `{
   "portLocation": "port of discharge or destination",
   "sealNumber": "seal number",
   "nvoName": "NVO or issuing agent name",
+  "customer": "short 2-8 char abbreviation for the freight forwarder/NVO who issued this DO. Derive from the issuing agent name on the document. Examples: OOCL Logistics → 'OOCL', Universal Shipping & Freight → 'USF', Page & Jones Huntsville → 'PJ-HVL', Page & Jones Birmingham → 'PJ-BHM', Amercare Royal → 'AMRC', DHL → 'DHL'. Use city abbreviations for offices: HVL=Huntsville, BHM=Birmingham, MOB=Mobile, DAL=Dallas, JAC=Jackson.",
   "carrierEmail": "carrier contact email if present, otherwise empty string",
   "packingListAttached": true or false based on whether a packing list is mentioned,
   "confidence": "high" if most fields found, "medium" if some missing, "low" if very few fields found,
@@ -140,12 +149,55 @@ export async function classifyEmailAsDO(subject: string, body: string): Promise<
     messages: [
       {
         role: 'user',
-        content: `Is this email a delivery order (DO) or freight release for a shipping container? Reply only "yes" or "no".\n\nA packing list, invoice, receipt, quote, or schedule is NOT a delivery order — answer "no" for those.\n\nSubject: ${subject}\n\nBody: ${body.slice(0, 800)}`,
+        content: `Is this email a delivery order (DO) or freight release for a shipping container? Reply only "yes" or "no".\n\nAnswer "no" for: packing lists, invoices, receipts, quotes, schedules, in-bond paperwork, arrival notices without a release, ETA update emails, appointment confirmations.\n\nSubject: ${subject}\n\nBody: ${body.slice(0, 800)}`,
       },
     ],
   })
   const text = response.content[0].type === 'text' ? response.content[0].text.toLowerCase().trim() : 'no'
   return text.startsWith('yes')
+}
+
+export async function classifyEmailAsETAUpdate(subject: string, body: string): Promise<boolean> {
+  const response = await client.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 5,
+    messages: [
+      {
+        role: 'user',
+        content: `Does this email contain updated ETAs, arrival dates, last free days, or delivery appointment confirmations for specific shipping containers? Reply only "yes" or "no".\n\nA full delivery order (DO), water report spreadsheet, invoice, or packing list is NOT an ETA update — answer "no" for those.\n\nSubject: ${subject}\n\nBody: ${body.slice(0, 800)}`,
+      },
+    ],
+  })
+  const text = response.content[0].type === 'text' ? response.content[0].text.toLowerCase().trim() : 'no'
+  return text.startsWith('yes')
+}
+
+export async function parseETAUpdateEmail(subject: string, body: string): Promise<ETAUpdate[]> {
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 1024,
+    system: 'You are a logistics email parser. Extract container ETA and appointment updates. Return ONLY valid JSON.',
+    messages: [
+      {
+        role: 'user',
+        content: `Extract all container ETA/appointment updates from this email. Return a JSON array where each element has:\n{\n  "containerNumber": "container number e.g. MSCU1234567",\n  "newETA": "new arrival/ETA date in MM/DD/YYYY format or null",\n  "lastFreeDay": "last free day date in MM/DD/YYYY format or null",\n  "appointmentDate": "scheduled delivery appointment date in MM/DD/YYYY format or null"\n}\n\nIf no containers are mentioned, return an empty array []. Return only the JSON array.\n\nSubject: ${subject}\n\nBody:\n${body.slice(0, 3000)}`,
+      },
+    ],
+  })
+  const text = response.content[0].type === 'text' ? response.content[0].text : '[]'
+  try {
+    const cleaned = text.replace(/^```json\s*/i, '').replace(/\s*```$/, '').trim()
+    const arr = JSON.parse(cleaned)
+    if (!Array.isArray(arr)) return []
+    return arr.map((item: Record<string, unknown>) => ({
+      containerNumber: String(item.containerNumber ?? ''),
+      newETA: item.newETA ? String(item.newETA) : null,
+      lastFreeDay: item.lastFreeDay ? String(item.lastFreeDay) : null,
+      appointmentDate: item.appointmentDate ? String(item.appointmentDate) : null,
+    }))
+  } catch {
+    return []
+  }
 }
 
 export async function classifyEmailAsWaterReport(subject: string, body: string): Promise<boolean> {
@@ -183,6 +235,7 @@ function parseMultiJsonResponse(text: string): ParsedDO[] {
         portLocation: String(p.portLocation ?? ''),
         sealNumber: String(p.sealNumber ?? ''),
         nvoName: String(p.nvoName ?? ''),
+        customer: String(p.customer ?? ''),
         carrierEmail: String(p.carrierEmail ?? ''),
         packingListAttached: Boolean(p.packingListAttached),
         confidence: (p.confidence as ParsedDO['confidence']) ?? 'low',
@@ -211,6 +264,7 @@ function parseJsonResponse(text: string): ParsedDO {
       portLocation: parsed.portLocation ?? '',
       sealNumber: parsed.sealNumber ?? '',
       nvoName: parsed.nvoName ?? '',
+      customer: parsed.customer ?? '',
       carrierEmail: parsed.carrierEmail ?? '',
       packingListAttached: Boolean(parsed.packingListAttached),
       confidence: parsed.confidence ?? 'low',
@@ -221,7 +275,7 @@ function parseJsonResponse(text: string): ParsedDO {
       containerNumber: '', masterBL: '', arrivalDate: '', consignee: '',
       consigneeAddress: '', cargoDescription: '', packages: '',
       weightKg: '', weightLb: '', portLocation: '', sealNumber: '',
-      nvoName: '', carrierEmail: '', packingListAttached: false,
+      nvoName: '', customer: '', carrierEmail: '', packingListAttached: false,
       confidence: 'low', notes: 'Failed to parse response from Claude',
     }
   }

@@ -10,6 +10,12 @@ redact/venv/
 redact/__pycache__/
 redact/*.pdf
 
+# Generated / local
+dashboard/tsconfig.tsbuildinfo
+.playwright-mcp/
+amercare-sample-emails/
+materials/
+
 # OS
 .DS_Store
 Thumbs.db

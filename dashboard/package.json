@@ -7,7 +7,7 @@
     "dashboard": "next dev --port 3002",
     "redact": "uvicorn main:app --app-dir ../redact --port 8000",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p 3002",
     "lint": "eslint",
     "auth": "tsx scripts/google-auth.ts"
   },
@@ -32,6 +32,7 @@
     "dotenv": "^18.0.8",
     "eslint": "^9",
     "eslint-config-next": "16.3.4",
+    "ssh2": "^1.17.0",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",
     "tsx": "^4.23.15",

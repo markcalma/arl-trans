@@ -79,8 +79,6 @@ export async function pollNewDOs(force = false): Promise<GmailMessage[]> {
   const auth = getAuthClient()
   const gmail = google.gmail({ version: 'v1', auth })
 
-  // 90d window so old test emails and inbox backlog are captured.
-  // force mode removes is:unread so manually-opened emails aren't missed.
   const q = force
     ? 'has:attachment newer_than:90d -category:promotions -category:social'
     : 'is:unread has:attachment newer_than:90d -category:promotions -category:social'
@@ -94,32 +92,37 @@ export async function pollNewDOs(force = false): Promise<GmailMessage[]> {
 
   for (const msg of messages) {
     if (!msg.id) continue
-    // DB-backed skip cache survives restarts — prevents re-classifying already-seen non-DO emails
     if (isGmailSkipped(msg.id, 'wfdo')) continue
 
-    const full = await gmail.users.messages.get({ userId: 'me', id: msg.id, format: 'full' })
-    const payload = full.data.payload
-    if (!payload) continue
-
-    const headers = payload.headers ?? []
-    const subject = headers.find((h) => h.name?.toLowerCase() === 'subject')?.value ?? ''
-    const from = headers.find((h) => h.name?.toLowerCase() === 'from')?.value ?? ''
-    const dateHeader = headers.find((h) => h.name?.toLowerCase() === 'date')?.value ?? ''
+    // Step 1: metadata fetch — headers + snippet only, skips full MIME/attachment download
+    const meta = await gmail.users.messages.get({
+      userId: 'me', id: msg.id, format: 'metadata',
+      metadataHeaders: ['Subject', 'From', 'Date'],
+    })
+    const metaHeaders = meta.data.payload?.headers ?? []
+    const subject = metaHeaders.find((h) => h.name?.toLowerCase() === 'subject')?.value ?? ''
+    const from = metaHeaders.find((h) => h.name?.toLowerCase() === 'from')?.value ?? ''
+    const dateHeader = metaHeaders.find((h) => h.name?.toLowerCase() === 'date')?.value ?? ''
     const receivedAt = dateHeader ? new Date(dateHeader).toISOString() : new Date().toISOString()
+    const snippet = meta.data.snippet ?? ''
 
-    const bodyText = extractBodyText(payload)
-
-    // Use Claude to determine if this email is a delivery order
-    const isDO = await classifyEmailAsDO(subject, bodyText)
+    // Step 2: classify on subject + snippet — full MIME not needed for yes/no
+    const isDO = await classifyEmailAsDO(subject, snippet)
     if (!isDO) {
       markGmailSkipped(msg.id, 'wfdo')
       console.log(`[gmail] Skipped non-DO email: "${subject}" from ${from}`)
       continue
     }
 
+    // Step 3: confirmed DO — fetch full email to download attachment data
+    const full = await gmail.users.messages.get({ userId: 'me', id: msg.id, format: 'full' })
+    const payload = full.data.payload
+    if (!payload) continue
+
+    const bodyText = extractBodyText(payload)
     const attachments = await extractAttachments(gmail, msg.id, payload)
     const filenames = attachments.map((a) => a.filename).join(', ')
-    console.log(`[gmail] DO classified: "${subject}" — attachments: ${filenames || '(none)'}`)
+    console.log(`[gmail] DO confirmed: "${subject}" — attachments: ${filenames || '(none)'}`)
 
     const hasRelevantAttachment = attachments.some(
       (a) => a.mimeType === 'application/pdf' || a.filename.endsWith('.xlsx') || a.filename.endsWith('.xls')
@@ -132,7 +135,6 @@ export async function pollNewDOs(force = false): Promise<GmailMessage[]> {
 
     results.push({ gmailId: msg.id, sender: from, subject, body: bodyText, attachments, receivedAt })
 
-    // Mark as read so we don't pick it up again
     await gmail.users.messages.modify({
       userId: 'me',
       id: msg.id,
@@ -263,19 +265,7 @@ export async function sendEmail(opts: {
 
 // ---------------------------------------------------------------------------
 // Poll for water report emails (WF1 — Amercare ACR Truck Dispatch Reports)
-// Returns emails that contain Excel or plain-text water report attachments.
-// Does NOT mark them as read — the poller does that after successful storage.
 // ---------------------------------------------------------------------------
-function extractFilenamesFromPayload(payload: MessagePart): string[] {
-  const names: string[] = []
-  function walk(part: MessagePart) {
-    if (part.filename) names.push(part.filename)
-    if (part.parts) (part.parts as MessagePart[]).forEach(walk)
-  }
-  walk(payload)
-  return names
-}
-
 export async function pollWaterReportEmails(force = false): Promise<GmailMessage[]> {
   const auth = getAuthClient()
   const gmail = google.gmail({ version: 'v1', auth })
@@ -294,31 +284,34 @@ export async function pollWaterReportEmails(force = false): Promise<GmailMessage
     if (!msg.id) continue
     if (isGmailSkipped(msg.id, 'wf1')) continue
 
-    const full = await gmail.users.messages.get({ userId: 'me', id: msg.id, format: 'full' })
-    const payload = full.data.payload
-    if (!payload) continue
-
-    const headers = payload.headers ?? []
-    const subject = headers.find((h) => h.name?.toLowerCase() === 'subject')?.value ?? ''
-    const from = headers.find((h) => h.name?.toLowerCase() === 'from')?.value ?? ''
-    const dateHeader = headers.find((h) => h.name?.toLowerCase() === 'date')?.value ?? ''
+    // Step 1: metadata fetch — headers + snippet only
+    const meta = await gmail.users.messages.get({
+      userId: 'me', id: msg.id, format: 'metadata',
+      metadataHeaders: ['Subject', 'From', 'Date'],
+    })
+    const metaHeaders = meta.data.payload?.headers ?? []
+    const subject = metaHeaders.find((h) => h.name?.toLowerCase() === 'subject')?.value ?? ''
+    const from = metaHeaders.find((h) => h.name?.toLowerCase() === 'from')?.value ?? ''
+    const dateHeader = metaHeaders.find((h) => h.name?.toLowerCase() === 'date')?.value ?? ''
     const receivedAt = dateHeader ? new Date(dateHeader).toISOString() : new Date().toISOString()
+    const snippet = meta.data.snippet ?? ''
 
-    const bodyText = extractBodyText(payload)
-    const attachmentFilenames = extractFilenamesFromPayload(payload)
-
-    // Shortcut: known water report filename patterns — skip Claude call
-    const filenameMatch = attachmentFilenames.some((fn) =>
-      /ACR.*Truck.*Dispatch/i.test(fn) || /AMERCARE/i.test(fn)
-    )
-    const isWaterReport = filenameMatch || await classifyEmailAsWaterReport(subject, bodyText)
+    // Subject shortcut: known water report subject patterns skip the Claude call entirely
+    const subjectMatch = /ACR.*Truck.*Dispatch/i.test(subject) || /AMERCARE/i.test(subject)
+    const isWaterReport = subjectMatch || await classifyEmailAsWaterReport(subject, snippet)
     if (!isWaterReport) {
       markGmailSkipped(msg.id, 'wf1')
       console.log(`[gmail/wf1] Skipped non-water-report: "${subject}"`)
       continue
     }
-    console.log(`[gmail/wf1] Water report detected: "${subject}" (filename match: ${filenameMatch})`)
+    console.log(`[gmail/wf1] Water report detected: "${subject}"${subjectMatch ? ' (subject shortcut)' : ''}`)
 
+    // Step 3: confirmed — fetch full email for attachment data
+    const full = await gmail.users.messages.get({ userId: 'me', id: msg.id, format: 'full' })
+    const payload = full.data.payload
+    if (!payload) continue
+
+    const bodyText = extractBodyText(payload)
     const attachments = await extractAttachments(gmail, msg.id, payload)
 
     const hasExcel = attachments.some(
@@ -335,8 +328,7 @@ export async function pollWaterReportEmails(force = false): Promise<GmailMessage
     })
 
     // Only mark as read if email actually has Excel content.
-    // False positives (DO emails misclassified as water reports) are left unread
-    // so the WF-DO poller can still pick them up.
+    // False positives left unread so the WF-DO poller can still pick them up.
     if (hasExcel) {
       await gmail.users.messages.modify({
         userId: 'me',
@@ -354,7 +346,6 @@ export async function pollWaterReportEmails(force = false): Promise<GmailMessage
 // ---------------------------------------------------------------------------
 // Poll for ETA update emails — arrival notices, appointment confirmations,
 // last-free-day notifications. These are text-only emails (no DO attachments).
-// Returns messages classified by Claude as containing container ETA updates.
 // ---------------------------------------------------------------------------
 export async function pollETAUpdateEmails(force = false): Promise<GmailMessage[]> {
   const auth = getAuthClient()
@@ -373,24 +364,33 @@ export async function pollETAUpdateEmails(force = false): Promise<GmailMessage[]
     if (!msg.id) continue
     if (isGmailSkipped(msg.id, 'eta')) continue
 
-    const full = await gmail.users.messages.get({ userId: 'me', id: msg.id, format: 'full' })
-    const payload = full.data.payload
-    if (!payload) continue
-
-    const headers = payload.headers ?? []
-    const subject = headers.find((h) => h.name?.toLowerCase() === 'subject')?.value ?? ''
-    const from = headers.find((h) => h.name?.toLowerCase() === 'from')?.value ?? ''
-    const dateHeader = headers.find((h) => h.name?.toLowerCase() === 'date')?.value ?? ''
+    // Step 1: metadata fetch — headers + snippet only
+    const meta = await gmail.users.messages.get({
+      userId: 'me', id: msg.id, format: 'metadata',
+      metadataHeaders: ['Subject', 'From', 'Date'],
+    })
+    const metaHeaders = meta.data.payload?.headers ?? []
+    const subject = metaHeaders.find((h) => h.name?.toLowerCase() === 'subject')?.value ?? ''
+    const from = metaHeaders.find((h) => h.name?.toLowerCase() === 'from')?.value ?? ''
+    const dateHeader = metaHeaders.find((h) => h.name?.toLowerCase() === 'date')?.value ?? ''
     const receivedAt = dateHeader ? new Date(dateHeader).toISOString() : new Date().toISOString()
-    const bodyText = extractBodyText(payload)
+    const snippet = meta.data.snippet ?? ''
 
-    const isETA = await classifyEmailAsETAUpdate(subject, bodyText)
+    // Step 2: classify on subject + snippet — full body not needed for yes/no
+    const isETA = await classifyEmailAsETAUpdate(subject, snippet)
     if (!isETA) {
       markGmailSkipped(msg.id, 'eta')
       continue
     }
 
     console.log(`[gmail/eta] ETA update detected: "${subject}" from ${from}`)
+
+    // Step 3: confirmed — fetch full email to get body text for parsing
+    const full = await gmail.users.messages.get({ userId: 'me', id: msg.id, format: 'full' })
+    const payload = full.data.payload
+    if (!payload) continue
+
+    const bodyText = extractBodyText(payload)
     results.push({ gmailId: msg.id, sender: from, subject, body: bodyText, attachments: [], receivedAt })
 
     await gmail.users.messages.modify({

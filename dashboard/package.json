@@ -6,7 +6,7 @@
     "dev": "concurrently -n dashboard,redact -c blue,green \"next dev --port 3002\" \"uvicorn main:app --app-dir ../redact --port 8000\"",
     "dashboard": "next dev --port 3002",
     "redact": "uvicorn main:app --app-dir ../redact --port 8000",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start -p 3002",
     "lint": "eslint",
     "auth": "tsx scripts/google-auth.ts"

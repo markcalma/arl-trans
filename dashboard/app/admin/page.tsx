@@ -46,6 +46,7 @@ export default function AdminPage() {
   const [connectResult, setConnectResult] = useState<{ ok: boolean; error?: string } | null>(null)
   const [pollResults, setPollResults] = useState<Record<string, PollResult | null>>({ wfdo: null, wf1: null, eta: null })
   const [polling, setPolling] = useState<Record<string, boolean>>({ wfdo: false, wf1: false, eta: false })
+  const [forcePolling, setForcePolling] = useState<Record<string, boolean>>({ wfdo: false, wf1: false, eta: false })
 
   const refreshStatus = useCallback(async () => {
     const [gmailRes, pollerRes] = await Promise.all([
@@ -76,16 +77,28 @@ export default function AdminPage() {
     if (data.url) window.location.href = data.url
   }
 
-  async function handlePollNow(type: 'wfdo' | 'wf1' | 'eta') {
-    setPolling(p => ({ ...p, [type]: true }))
+  async function handlePollNow(type: 'wfdo' | 'wf1' | 'eta', force = false) {
+    if (force) {
+      setForcePolling(p => ({ ...p, [type]: true }))
+    } else {
+      setPolling(p => ({ ...p, [type]: true }))
+    }
     setPollResults(r => ({ ...r, [type]: null }))
     try {
-      const res = await fetch(`/api/poll-now/${type}`, { method: 'POST' })
+      const res = await fetch(`/api/poll-now/${type}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(force ? { force: true } : {}),
+      })
       const data = await res.json()
       setPollResults(r => ({ ...r, [type]: data }))
       refreshStatus()
     } finally {
-      setPolling(p => ({ ...p, [type]: false }))
+      if (force) {
+        setForcePolling(p => ({ ...p, [type]: false }))
+      } else {
+        setPolling(p => ({ ...p, [type]: false }))
+      }
     }
   }
 
@@ -215,14 +228,25 @@ export default function AdminPage() {
                     </div>
                   )}
                 </div>
-                <button
-                  onClick={() => handlePollNow(key)}
-                  disabled={polling[key]}
-                  className="shrink-0 flex items-center gap-1.5 text-[12px] font-medium text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-3 py-1.5 hover:bg-blue-100 disabled:opacity-50 transition-colors"
-                >
-                  <RefreshCw size={12} className={polling[key] ? 'animate-spin' : ''} />
-                  {polling[key] ? 'Running…' : 'Run now'}
-                </button>
+                <div className="shrink-0 flex flex-col gap-1.5">
+                  <button
+                    onClick={() => handlePollNow(key)}
+                    disabled={polling[key] || forcePolling[key]}
+                    className="flex items-center gap-1.5 text-[12px] font-medium text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-3 py-1.5 hover:bg-blue-100 disabled:opacity-50 transition-colors"
+                  >
+                    <RefreshCw size={12} className={polling[key] ? 'animate-spin' : ''} />
+                    {polling[key] ? 'Running…' : 'Run now'}
+                  </button>
+                  <button
+                    onClick={() => handlePollNow(key, true)}
+                    disabled={polling[key] || forcePolling[key]}
+                    title="Scans read + unread emails from last 90 days"
+                    className="flex items-center gap-1.5 text-[11px] font-medium text-gray-600 bg-white border border-gray-200 rounded-lg px-3 py-1 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                  >
+                    <RefreshCw size={11} className={forcePolling[key] ? 'animate-spin' : ''} />
+                    {forcePolling[key] ? 'Scanning…' : 'Force scan'}
+                  </button>
+                </div>
               </div>
             )
           })}

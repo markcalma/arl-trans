@@ -80,6 +80,15 @@ function migrate(db: Database.Database): void {
       updates      TEXT NOT NULL DEFAULT '[]'
     );
   `)
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS skipped_gmail_ids (
+      gmail_id    TEXT NOT NULL,
+      workflow    TEXT NOT NULL DEFAULT 'wfdo',
+      skipped_at  TEXT NOT NULL,
+      PRIMARY KEY (gmail_id, workflow)
+    );
+  `)
 }
 
 function rowToOrder(row: Record<string, unknown>): WFDOOrder {
@@ -294,6 +303,16 @@ export function wf1GmailIdExists(gmailId: string): boolean {
 // ---------------------------------------------------------------------------
 // ETA Updates
 // ---------------------------------------------------------------------------
+
+export function markGmailSkipped(gmailId: string, workflow: 'wfdo' | 'wf1' | 'eta'): void {
+  const db = getDb()
+  db.prepare('INSERT OR IGNORE INTO skipped_gmail_ids (gmail_id, workflow, skipped_at) VALUES (?, ?, ?)').run(gmailId, workflow, new Date().toISOString())
+}
+
+export function isGmailSkipped(gmailId: string, workflow: 'wfdo' | 'wf1' | 'eta'): boolean {
+  const db = getDb()
+  return Boolean(db.prepare('SELECT 1 FROM skipped_gmail_ids WHERE gmail_id = ? AND workflow = ?').get(gmailId, workflow))
+}
 
 export function etaUpdateGmailIdExists(gmailId: string): boolean {
   const db = getDb()

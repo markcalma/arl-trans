@@ -27,7 +27,7 @@ export function startPoller(): void {
   setInterval(runETAUpdatePoll, POLL_INTERVAL_MS)
 }
 
-export async function runDoPoll(): Promise<{ ingested: number; error: string | null }> {
+export async function runDoPoll(force = false): Promise<{ ingested: number; error: string | null }> {
   if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.ANTHROPIC_API_KEY) {
     return { ingested: 0, error: null }
   }
@@ -37,7 +37,7 @@ export async function runDoPoll(): Promise<{ ingested: number; error: string | n
 
   let ingested = 0
   try {
-    const messages = await pollNewDOs()
+    const messages = await pollNewDOs(force)
     if (messages.length === 0) {
       updateWFDOStatus(0, null)
       return { ingested: 0, error: null }
@@ -48,6 +48,9 @@ export async function runDoPoll(): Promise<{ ingested: number; error: string | n
 
     for (const msg of messages) {
       if (gmailIdExists(msg.gmailId)) continue
+
+      // Normalize container numbers: ISO 6346 format has no spaces (ABCD1234567)
+      function normalizeContainer(s: string | undefined): string { return (s ?? '').replace(/\s+/g, '').toUpperCase() }
 
       // Skip PAC / PL (packing list) PDFs — they are not delivery orders
       const pdfAttachment = msg.attachments.find(
@@ -61,7 +64,8 @@ export async function runDoPoll(): Promise<{ ingested: number; error: string | n
       if (xlsxAttachment && !pdfAttachment) {
         const parsed = parseUSFDeliveryOrderExcel(xlsxAttachment.data)
         const id = randomUUID()
-        console.log(`[poller] Parsed Excel DO from ${msg.sender} (container: ${parsed.containerNumber || 'unknown'})`)
+        const excelContainer = normalizeContainer(parsed.containerNumber)
+        console.log(`[poller] Parsed Excel DO from ${msg.sender} (container: ${excelContainer || 'unknown'})`)
         insertDOOrder({
           id,
           status: 'pending_redaction',
@@ -70,7 +74,7 @@ export async function runDoPoll(): Promise<{ ingested: number; error: string | n
           subject: msg.subject,
           gmailId: msg.gmailId,
           pdfPath: undefined,
-          containerNumber: parsed.containerNumber,
+          containerNumber: excelContainer,
           masterBL: parsed.masterBL,
           arrivalDate: parsed.arrivalDate,
           consignee: parsed.consignee,
@@ -145,7 +149,7 @@ export async function runDoPoll(): Promise<{ ingested: number; error: string | n
             subject: msg.subject,
             gmailId: i === 0 ? msg.gmailId : undefined,
             pdfPath,
-            containerNumber: parsed.containerNumber,
+            containerNumber: normalizeContainer(parsed.containerNumber),
             masterBL: parsed.masterBL,
             arrivalDate: parsed.arrivalDate,
             consignee: parsed.consignee,
@@ -182,7 +186,7 @@ export async function runDoPoll(): Promise<{ ingested: number; error: string | n
   }
 }
 
-export async function runWF1Poll(): Promise<{ ingested: number; error: string | null }> {
+export async function runWF1Poll(force = false): Promise<{ ingested: number; error: string | null }> {
   if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.ANTHROPIC_API_KEY) {
     return { ingested: 0, error: null }
   }
@@ -192,7 +196,7 @@ export async function runWF1Poll(): Promise<{ ingested: number; error: string | 
 
   let ingested = 0
   try {
-    const messages = await pollWaterReportEmails()
+    const messages = await pollWaterReportEmails(force)
     if (messages.length === 0) {
       updateWF1Status(0, null)
       return { ingested: 0, error: null }
@@ -258,7 +262,7 @@ export async function runWF1Poll(): Promise<{ ingested: number; error: string | 
   }
 }
 
-export async function runETAUpdatePoll(): Promise<{ processed: number; error: string | null }> {
+export async function runETAUpdatePoll(force = false): Promise<{ processed: number; error: string | null }> {
   if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.ANTHROPIC_API_KEY) {
     return { processed: 0, error: null }
   }
@@ -267,7 +271,7 @@ export async function runETAUpdatePoll(): Promise<{ processed: number; error: st
 
   let processed = 0
   try {
-    const messages = await pollETAUpdateEmails()
+    const messages = await pollETAUpdateEmails(force)
     if (messages.length === 0) {
       updateETAStatus(0, null)
       return { processed: 0, error: null }

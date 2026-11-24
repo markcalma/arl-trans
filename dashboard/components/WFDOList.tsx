@@ -53,6 +53,9 @@ export function WFDOList({ orders }: { orders: WFDOOrder[] }) {
   const [markError, setMarkError] = useState<Record<string, string>>({})
   const [downloading, setDownloading] = useState<string | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
+  const [resyncingId, setResyncingId] = useState<string | null>(null)
+  const [resyncResult, setResyncResult] = useState<Record<string, { ok: boolean; errors?: string[] }>>({})
+
 
   const pendingOrders = orders.filter(isPending)
   const sentOrders = orders.filter(isSent)
@@ -146,6 +149,20 @@ export function WFDOList({ orders }: { orders: WFDOOrder[] }) {
       URL.revokeObjectURL(url)
     }
     setDownloading(null)
+  }
+
+  async function handleResync(id: string) {
+    setResyncingId(id)
+    setResyncResult((prev) => { const n = { ...prev }; delete n[id]; return n })
+    try {
+      const res = await fetch(`/api/wfdo-resync/${encodeURIComponent(id)}`, { method: 'POST' })
+      const data = await res.json()
+      setResyncResult((prev) => ({ ...prev, [id]: { ok: res.ok && data.ok, errors: data.errors } }))
+    } catch (err) {
+      setResyncResult((prev) => ({ ...prev, [id]: { ok: false, errors: [String(err)] } }))
+    } finally {
+      setResyncingId(null)
+    }
   }
 
   async function handleCopy(key: string, text: string) {
@@ -383,23 +400,41 @@ export function WFDOList({ orders }: { orders: WFDOOrder[] }) {
 
                 {/* ── Sent: read-only summary ── */}
                 {sent && (
-                  <div className="grid grid-cols-2 gap-y-3">
-                    {[
-                      { label: 'Consignee',      value: o.consignee },
-                      { label: 'Master BL',      value: o.masterBL },
-                      { label: 'Port / Location',value: o.portLocation },
-                      { label: 'Carrier Email',  value: o.carrierEmail },
-                    ].map(({ label, value }) => (
-                      <div key={label}>
-                        <p className="text-[11px] font-medium text-muted">{label}</p>
-                        <p className="text-[13px] text-foreground mt-0.5">{value || '—'}</p>
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-y-3">
+                      {[
+                        { label: 'Consignee',      value: o.consignee },
+                        { label: 'Master BL',      value: o.masterBL },
+                        { label: 'Port / Location',value: o.portLocation },
+                        { label: 'Carrier Email',  value: o.carrierEmail },
+                      ].map(({ label, value }) => (
+                        <div key={label}>
+                          <p className="text-[11px] font-medium text-muted">{label}</p>
+                          <p className="text-[13px] text-foreground mt-0.5">{value || '—'}</p>
+                        </div>
+                      ))}
+                      <div className="col-span-2">
+                        <p className="text-[11px] font-medium text-muted">Marked Sent</p>
+                        <p className="text-[13px] text-foreground mt-0.5">
+                          {o.sentAt ? new Date(o.sentAt).toLocaleString() : '—'}
+                        </p>
                       </div>
-                    ))}
-                    <div className="col-span-2">
-                      <p className="text-[11px] font-medium text-muted">Marked Sent</p>
-                      <p className="text-[13px] text-foreground mt-0.5">
-                        {o.sentAt ? new Date(o.sentAt).toLocaleString() : '—'}
-                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 pt-1 border-t border-background">
+                      <button
+                        onClick={() => handleResync(o.id)}
+                        disabled={resyncingId === o.id}
+                        className="text-[12px] font-medium text-blue-700 bg-blue-50 border border-blue-100 rounded-full px-4 py-1.5 hover:bg-blue-100 transition-colors disabled:opacity-50"
+                      >
+                        {resyncingId === o.id ? 'Syncing…' : 'Re-sync to Sheets'}
+                      </button>
+                      {resyncResult[o.id] && (
+                        <span className={`text-[11px] rounded-lg px-2.5 py-1 ${
+                          resyncResult[o.id].ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+                        }`}>
+                          {resyncResult[o.id].ok ? '✓ Synced' : `Error: ${resyncResult[o.id].errors?.join(', ')}`}
+                        </span>
+                      )}
                     </div>
                   </div>
                 )}

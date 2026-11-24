@@ -2,13 +2,11 @@ import { google } from 'googleapis'
 import fs from 'fs'
 import path from 'path'
 import { classifyEmailAsDO, classifyEmailAsWaterReport, classifyEmailAsETAUpdate } from './claude'
+import { isGmailSkipped, markGmailSkipped } from './db'
 
 const TOKENS_PATH = path.join(process.cwd(), 'data', 'google-tokens.json')
 const REDIRECT_URI = process.env.OAUTH_REDIRECT_URI ?? 'http://localhost:3002/api/auth/gmail/callback'
 
-// In-memory sets of gmail IDs already classified this session (avoids repeated API calls)
-const skippedGmailIds = new Set<string>()
-const skippedWaterReportIds = new Set<string>()
 const SCOPES = [
   'https://www.googleapis.com/auth/gmail.readonly',
   'https://www.googleapis.com/auth/gmail.send',
@@ -76,24 +74,28 @@ export async function exchangeCode(code: string): Promise<void> {
   console.log('Tokens saved to', TOKENS_PATH)
 }
 
-export async function pollNewDOs(): Promise<GmailMessage[]> {
+// force=true removes the is:unread filter — used by admin "Force scan" to catch already-read emails
+export async function pollNewDOs(force = false): Promise<GmailMessage[]> {
   const auth = getAuthClient()
   const gmail = google.gmail({ version: 'v1', auth })
 
-  // Search recent unread emails with attachments — Claude will classify each one
-  // No category filter: forwarded DO emails land in CATEGORY_PERSONAL, not Primary
-  const q = 'is:unread has:attachment newer_than:7d -category:promotions -category:social'
+  // 90d window so old test emails and inbox backlog are captured.
+  // force mode removes is:unread so manually-opened emails aren't missed.
+  const q = force
+    ? 'has:attachment newer_than:90d -category:promotions -category:social'
+    : 'is:unread has:attachment newer_than:90d -category:promotions -category:social'
 
   const listRes = await gmail.users.messages.list({ userId: 'me', q, maxResults: 50 })
   const messages = listRes.data.messages ?? []
   if (messages.length === 0) return []
-  console.log(`[gmail] Poll found ${messages.length} unread emails with attachments`)
+  console.log(`[gmail] Poll found ${messages.length} emails with attachments${force ? ' (force scan)' : ''}`)
 
   const results: GmailMessage[] = []
 
   for (const msg of messages) {
     if (!msg.id) continue
-    if (skippedGmailIds.has(msg.id)) { console.log(`[gmail] Silently skipping cached ID ${msg.id}`); continue }
+    // DB-backed skip cache survives restarts — prevents re-classifying already-seen non-DO emails
+    if (isGmailSkipped(msg.id, 'wfdo')) continue
 
     const full = await gmail.users.messages.get({ userId: 'me', id: msg.id, format: 'full' })
     const payload = full.data.payload
@@ -110,7 +112,7 @@ export async function pollNewDOs(): Promise<GmailMessage[]> {
     // Use Claude to determine if this email is a delivery order
     const isDO = await classifyEmailAsDO(subject, bodyText)
     if (!isDO) {
-      skippedGmailIds.add(msg.id)
+      markGmailSkipped(msg.id, 'wfdo')
       console.log(`[gmail] Skipped non-DO email: "${subject}" from ${from}`)
       continue
     }
@@ -123,7 +125,7 @@ export async function pollNewDOs(): Promise<GmailMessage[]> {
       (a) => a.mimeType === 'application/pdf' || a.filename.endsWith('.xlsx') || a.filename.endsWith('.xls')
     )
     if (!hasRelevantAttachment) {
-      skippedGmailIds.add(msg.id)
+      markGmailSkipped(msg.id, 'wfdo')
       console.log(`[gmail] DO has no PDF/xlsx attachment — skipping`)
       continue
     }
@@ -274,20 +276,23 @@ function extractFilenamesFromPayload(payload: MessagePart): string[] {
   return names
 }
 
-export async function pollWaterReportEmails(): Promise<GmailMessage[]> {
+export async function pollWaterReportEmails(force = false): Promise<GmailMessage[]> {
   const auth = getAuthClient()
   const gmail = google.gmail({ version: 'v1', auth })
 
-  const listRes = await gmail.users.messages.list({ userId: 'me', q: 'is:unread newer_than:7d -category:promotions -category:social', maxResults: 50 })
+  const q = force
+    ? 'newer_than:90d -category:promotions -category:social'
+    : 'is:unread newer_than:90d -category:promotions -category:social'
+  const listRes = await gmail.users.messages.list({ userId: 'me', q, maxResults: 50 })
   const messages = listRes.data.messages ?? []
   if (messages.length === 0) return []
-  console.log(`[gmail/wf1] Poll found ${messages.length} unread emails`)
+  console.log(`[gmail/wf1] Poll found ${messages.length} emails${force ? ' (force scan)' : ''}`)
 
   const results: GmailMessage[] = []
 
   for (const msg of messages) {
     if (!msg.id) continue
-    if (skippedWaterReportIds.has(msg.id)) { console.log(`[gmail/wf1] Silently skipping cached ID ${msg.id}`); continue }
+    if (isGmailSkipped(msg.id, 'wf1')) continue
 
     const full = await gmail.users.messages.get({ userId: 'me', id: msg.id, format: 'full' })
     const payload = full.data.payload
@@ -308,7 +313,7 @@ export async function pollWaterReportEmails(): Promise<GmailMessage[]> {
     )
     const isWaterReport = filenameMatch || await classifyEmailAsWaterReport(subject, bodyText)
     if (!isWaterReport) {
-      skippedWaterReportIds.add(msg.id)
+      markGmailSkipped(msg.id, 'wf1')
       console.log(`[gmail/wf1] Skipped non-water-report: "${subject}"`)
       continue
     }
@@ -339,7 +344,7 @@ export async function pollWaterReportEmails(): Promise<GmailMessage[]> {
         requestBody: { removeLabelIds: ['UNREAD'] },
       })
     } else {
-      skippedWaterReportIds.add(msg.id)
+      markGmailSkipped(msg.id, 'wf1')
     }
   }
 
@@ -351,18 +356,14 @@ export async function pollWaterReportEmails(): Promise<GmailMessage[]> {
 // last-free-day notifications. These are text-only emails (no DO attachments).
 // Returns messages classified by Claude as containing container ETA updates.
 // ---------------------------------------------------------------------------
-const skippedETAIds = new Set<string>()
-
-export async function pollETAUpdateEmails(): Promise<GmailMessage[]> {
+export async function pollETAUpdateEmails(force = false): Promise<GmailMessage[]> {
   const auth = getAuthClient()
   const gmail = google.gmail({ version: 'v1', auth })
 
-  // Look at unread emails — same pool as other pollers, but text-only focus
-  const listRes = await gmail.users.messages.list({
-    userId: 'me',
-    q: 'is:unread newer_than:7d -category:promotions -category:social',
-    maxResults: 50,
-  })
+  const q = force
+    ? 'newer_than:90d -category:promotions -category:social'
+    : 'is:unread newer_than:90d -category:promotions -category:social'
+  const listRes = await gmail.users.messages.list({ userId: 'me', q, maxResults: 50 })
   const messages = listRes.data.messages ?? []
   if (messages.length === 0) return []
 
@@ -370,7 +371,7 @@ export async function pollETAUpdateEmails(): Promise<GmailMessage[]> {
 
   for (const msg of messages) {
     if (!msg.id) continue
-    if (skippedETAIds.has(msg.id)) continue
+    if (isGmailSkipped(msg.id, 'eta')) continue
 
     const full = await gmail.users.messages.get({ userId: 'me', id: msg.id, format: 'full' })
     const payload = full.data.payload
@@ -385,7 +386,7 @@ export async function pollETAUpdateEmails(): Promise<GmailMessage[]> {
 
     const isETA = await classifyEmailAsETAUpdate(subject, bodyText)
     if (!isETA) {
-      skippedETAIds.add(msg.id)
+      markGmailSkipped(msg.id, 'eta')
       continue
     }
 

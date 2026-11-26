@@ -40,6 +40,7 @@ export function WF1BatchList({ initialBatches }: { initialBatches: WF1Batch[] })
   const [isPending, startTransition] = useTransition()
   const [actionError, setActionError] = useState<string | null>(null)
   const [lastResult, setLastResult] = useState<ApproveResult | null>(null)
+  const [confirmReject, setConfirmReject] = useState<string | null>(null)
 
   function refresh() { router.refresh() }
 
@@ -62,6 +63,7 @@ export function WF1BatchList({ initialBatches }: { initialBatches: WF1Batch[] })
   }
 
   function reject(id: string) {
+    setConfirmReject(null)
     setActionError(null)
     setLastResult(null)
     startTransition(async () => {
@@ -213,13 +215,32 @@ export function WF1BatchList({ initialBatches }: { initialBatches: WF1Batch[] })
                     >
                       Approve → Sheets
                     </button>
-                    <button
-                      onClick={() => reject(batch.id)}
-                      disabled={isPending}
-                      className="text-[12px] font-medium text-red-600 hover:text-red-700 px-2.5 py-1.5 rounded-lg border border-red-200 hover:border-red-300 transition-colors"
-                    >
-                      Reject
-                    </button>
+                    {confirmReject === batch.id ? (
+                      <span className="flex items-center gap-2 text-[12px]">
+                        <span className="text-amber-700">Sure?</span>
+                        <button
+                          onClick={() => reject(batch.id)}
+                          disabled={isPending}
+                          className="font-medium text-red-600 hover:text-red-800 underline disabled:opacity-50"
+                        >
+                          Confirm
+                        </button>
+                        <button
+                          onClick={() => setConfirmReject(null)}
+                          className="text-muted hover:text-foreground"
+                        >
+                          Cancel
+                        </button>
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmReject(batch.id)}
+                        disabled={isPending}
+                        className="text-[12px] font-medium text-red-600 hover:text-red-700 px-2.5 py-1.5 rounded-lg border border-red-200 hover:border-red-300 transition-colors disabled:opacity-50"
+                      >
+                        Reject
+                      </button>
+                    )}
                   </>
                 )}
                 {batch.status === 'approved' && (

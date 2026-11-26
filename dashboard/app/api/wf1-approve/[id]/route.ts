@@ -14,10 +14,12 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   }
 
   const now = new Date().toISOString()
+  // Team Three batches only write to Load Board — MCL is updated via WF-DO when DO arrives
+  const isTeamThree = batch.sourceFormat === 'team3'
 
   const [lbResult, mlResult] = await Promise.allSettled([
     upsertWF1ContainersToLoadBoard(batch.containers),
-    upsertWF1ContainersToMasterList(batch.containers),
+    isTeamThree ? Promise.resolve({ written: 0, updated: 0, errors: [], tabs: {} }) : upsertWF1ContainersToMasterList(batch.containers),
   ])
 
   const lbData = lbResult.status === 'fulfilled' ? lbResult.value : { written: 0, updated: 0, errors: [String((lbResult as PromiseRejectedResult).reason)], tabs: {} }
@@ -30,7 +32,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   return NextResponse.json({
     ok: true,
     loadBoard: { written: lbData.written, updated: lbData.updated, tabs: lbData.tabs },
-    masterList: { written: mlData.written, updated: mlData.updated, tabs: mlData.tabs },
+    masterList: isTeamThree ? undefined : { written: mlData.written, updated: mlData.updated, tabs: mlData.tabs },
     errors: allErrors.length > 0 ? allErrors : undefined,
   })
 }

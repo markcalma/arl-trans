@@ -120,6 +120,68 @@ function parseAcrXlsm(rows: unknown[][]): WF1Container[] {
 }
 
 // ---------------------------------------------------------------------------
+// Team Three daily schedule email parser.
+//
+// Email body is plain text, NO attachment. Format per record (11 lines):
+//   PO | Product Category | ETA Port | Container # | Seal # |
+//   Delivery Date | Last Free Day | AvaiL | SSL | Days Out | Notes
+// Some senders omit trailing blank fields, so we anchor on container # lines.
+// All Team Three loads are 10 days free (Gary confirmed).
+// Destination is derived from the email subject (Stockton or Exton).
+// ---------------------------------------------------------------------------
+export function parseTeamThreeSchedule(body: string, subject: string): WF1Container[] {
+  const lines = body.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n')
+
+  const notesIdx = lines.findIndex((l) => l.trim() === 'Notes')
+  if (notesIdx === -1) return []
+  const dataLines = lines.slice(notesIdx + 1)
+
+  const subjectUpper = subject.toUpperCase()
+  const destination = subjectUpper.includes('EXTON') ? 'EXTON' : 'STOCKTON'
+
+  // Find all container # positions (ISO 6346: 4 letters + 7 digits)
+  const containerPositions: number[] = []
+  for (let i = 0; i < dataLines.length; i++) {
+    if (/^[A-Z]{4}\d{7}$/.test(dataLines[i].trim())) containerPositions.push(i)
+  }
+
+  const containers: WF1Container[] = []
+
+  for (let ci = 0; ci < containerPositions.length; ci++) {
+    const i = containerPositions[ci]
+    const containerNum = dataLines[i].trim()
+    const etaPort = i >= 1 ? dataLines[i - 1].trim() : ''
+    const po = i >= 3 ? dataLines[i - 3].trim() : ''
+    const sealNumber = i + 1 < dataLines.length ? dataLines[i + 1].trim() : ''
+
+    // SSL: scan up to 6 lines after container # — first 2–5 uppercase-only word (carrier code)
+    const nextContainerIdx = ci + 1 < containerPositions.length ? containerPositions[ci + 1] : dataLines.length
+    let ssl = ''
+    for (let j = i + 2; j < Math.min(i + 7, nextContainerIdx); j++) {
+      const candidate = dataLines[j].trim()
+      if (/^[A-Z]{2,5}$/.test(candidate) && candidate !== 'X') { ssl = candidate; break }
+    }
+
+    // Terminal: last non-empty, non-code line before the next container
+    let terminal = ''
+    for (let j = nextContainerIdx - 1; j > i + 1; j--) {
+      const candidate = dataLines[j].trim()
+      if (candidate && !/^[A-Z]{2,5}$/.test(candidate) && candidate !== 'X' &&
+          !/^\d{1,3}$/.test(candidate) && !/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(candidate)) {
+        terminal = candidate; break
+      }
+    }
+
+    const eta = normalizeDate(etaPort)
+    if (!eta) continue
+
+    containers.push({ containerNumber: containerNum, destination, eta, freeDays: 10, sslLine: ssl, terminal, size: '', bl: '', po, sealNumber })
+  }
+
+  return containers
+}
+
+// ---------------------------------------------------------------------------
 // Plain text / HTML email body parser (work order format from Mikki Corvey).
 // Expected columns (11 per row after header):
 // PO | Product Category | ETA Port | Container # | Seal # |

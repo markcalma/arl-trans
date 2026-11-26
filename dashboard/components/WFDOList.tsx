@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { ChevronDown } from 'lucide-react'
 import { WFDOOrder } from '@/lib/types'
 import { WFDORedactEditor } from './WFDORedactEditor'
@@ -25,18 +26,27 @@ function StageBar({ stage }: { stage: Stage }) {
   const activeIdx = steps.findIndex((s) => s.key === stage)
 
   return (
-    <div className="flex items-center gap-1 select-none">
+    <div className="flex items-center select-none">
       {steps.map((s, i) => (
-        <span key={s.key} className="flex items-center gap-1">
-          <span className={`text-[12px] font-medium px-3 py-1 rounded-full transition-colors ${
-            i < activeIdx  ? 'text-muted' :
-            i === activeIdx ? 'bg-gray-900 text-white' :
-            'text-gray-300'
-          }`}>
-            {i + 1} · {s.label}
+        <span key={s.key} className="flex items-center">
+          <span className="flex items-center gap-2">
+            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 transition-colors ${
+              i < activeIdx  ? 'bg-gray-300 text-white' :
+              i === activeIdx ? 'bg-blue-600 text-white' :
+              'border-2 border-gray-200 text-gray-300'
+            }`}>
+              {i < activeIdx ? '✓' : i + 1}
+            </span>
+            <span className={`text-[12px] font-medium transition-colors ${
+              i < activeIdx  ? 'text-gray-400' :
+              i === activeIdx ? 'text-gray-900' :
+              'text-gray-300'
+            }`}>
+              {s.label}
+            </span>
           </span>
           {i < steps.length - 1 && (
-            <span className={`text-[12px] ${i < activeIdx ? 'text-muted' : 'text-gray-200'}`}>→</span>
+            <span className={`mx-3 h-px w-8 shrink-0 ${i < activeIdx ? 'bg-gray-300' : 'bg-gray-100'}`} />
           )}
         </span>
       ))}
@@ -45,6 +55,7 @@ function StageBar({ stage }: { stage: Stage }) {
 }
 
 export function WFDOList({ orders }: { orders: WFDOOrder[] }) {
+  const router = useRouter()
   const [tab, setTab] = useState<Tab>('pending')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [stages, setStages] = useState<Record<string, Stage>>({})
@@ -55,6 +66,7 @@ export function WFDOList({ orders }: { orders: WFDOOrder[] }) {
   const [copied, setCopied] = useState<string | null>(null)
   const [resyncingId, setResyncingId] = useState<string | null>(null)
   const [resyncResult, setResyncResult] = useState<Record<string, { ok: boolean; errors?: string[] }>>({})
+  const [confirmReRedact, setConfirmReRedact] = useState<string | null>(null)
 
 
   const pendingOrders = orders.filter(isPending)
@@ -64,8 +76,8 @@ export function WFDOList({ orders }: { orders: WFDOOrder[] }) {
     tab === 'sent'    ? sentOrders :
     orders
 
-  function getStage(id: string, hasPdf: boolean): Stage {
-    return stages[id] ?? (hasPdf ? 'redact' : 'review')
+  function getStage(id: string, hasPdf: boolean, redactedAt?: string): Stage {
+    return stages[id] ?? (redactedAt ? 'review' : hasPdf ? 'redact' : 'review')
   }
 
   function setStage(id: string, s: Stage) {
@@ -123,7 +135,7 @@ export function WFDOList({ orders }: { orders: WFDOOrder[] }) {
         body: JSON.stringify(merged),
       })
       if (!res.ok) throw new Error(`Server error ${res.status}`)
-      window.location.reload()
+      router.refresh()
     } catch (err) {
       setMarkError((prev) => ({ ...prev, [o.id]: String(err) }))
     } finally {
@@ -132,8 +144,9 @@ export function WFDOList({ orders }: { orders: WFDOOrder[] }) {
   }
 
   async function handleReRedact(o: WFDOOrder) {
+    setConfirmReRedact(null)
     await fetch(`/api/wfdo-re-redact/${encodeURIComponent(o.id)}`, { method: 'POST' })
-    window.location.reload()
+    router.refresh()
   }
 
   async function handleDownloadPdf(o: WFDOOrder) {
@@ -197,14 +210,23 @@ export function WFDOList({ orders }: { orders: WFDOOrder[] }) {
 
       {visible.length === 0 && (
         <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.06)] px-5 py-12 text-center">
-          <p className="text-[14px] text-muted">No delivery orders to show.</p>
+          {tab === 'pending' ? (
+            <>
+              <p className="text-[14px] text-muted">No pending DOs — inbox is checked every 60 seconds.</p>
+              <p className="text-[13px] text-muted mt-1">
+                <a href="/admin" className="text-blue-600 hover:underline">Run a poll now →</a>
+              </p>
+            </>
+          ) : (
+            <p className="text-[14px] text-muted">No delivery orders to show.</p>
+          )}
         </div>
       )}
 
       {visible.map((o) => {
         const isExpanded = expandedId === o.id
         const hasPdf = Boolean(o.pdfPath)
-        const stage = getStage(o.id, hasPdf)
+        const stage = getStage(o.id, hasPdf, o.redactedAt)
         const pending = isPending(o)
         const sent = isSent(o)
         const subStatus = pending
@@ -215,7 +237,7 @@ export function WFDOList({ orders }: { orders: WFDOOrder[] }) {
           <div
             key={o.id}
             className={`bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.06)] overflow-hidden ${
-              o.status === 'needs_manual_review' ? 'ring-1 ring-amber-200' : ''
+              o.status === 'needs_manual_review' ? 'border-l-4 border-amber-400' : 'border-l-4 border-transparent'
             }`}
           >
             {/* Collapsed row */}
@@ -325,7 +347,7 @@ export function WFDOList({ orders }: { orders: WFDOOrder[] }) {
                         <div className="flex justify-end pt-1">
                           <button
                             onClick={() => setStage(o.id, 'send')}
-                            className="text-[12px] font-medium text-white bg-blue-600 rounded-full px-4 py-1.5 hover:bg-blue-700 transition-colors"
+                            className="text-[12px] font-medium text-white bg-blue-600 rounded-lg px-4 py-1.5 hover:bg-blue-700 transition-colors"
                           >
                             Next: Prepare to Send →
                           </button>
@@ -347,30 +369,48 @@ export function WFDOList({ orders }: { orders: WFDOOrder[] }) {
                             <button
                               onClick={() => handleDownloadPdf(o)}
                               disabled={downloading === o.id}
-                              className="text-[12px] font-medium text-foreground bg-white border border-gray-200 rounded-full px-4 py-1.5 hover:bg-background transition-colors disabled:opacity-50"
+                              className="text-[12px] font-medium text-foreground bg-white border border-gray-200 rounded-lg px-4 py-1.5 hover:bg-background transition-colors disabled:opacity-50"
                             >
                               {downloading === o.id ? 'Downloading…' : 'Download PDF'}
                             </button>
                           )}
                           <button
                             onClick={() => handleCopy(`subject-${o.id}`, buildSubject(o))}
-                            className="text-[12px] font-medium text-blue-700 bg-blue-50 border border-blue-100 rounded-full px-4 py-1.5 hover:bg-blue-100 transition-colors"
+                            className="text-[12px] font-medium text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-4 py-1.5 hover:bg-blue-100 transition-colors"
                           >
                             {copied === `subject-${o.id}` ? '✓ Copied!' : 'Copy Subject'}
                           </button>
                           <button
                             onClick={() => handleCopy(`body-${o.id}`, buildBody(o))}
-                            className="text-[12px] font-medium text-blue-700 bg-blue-50 border border-blue-100 rounded-full px-4 py-1.5 hover:bg-blue-100 transition-colors"
+                            className="text-[12px] font-medium text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-4 py-1.5 hover:bg-blue-100 transition-colors"
                           >
                             {copied === `body-${o.id}` ? '✓ Copied!' : 'Copy Body'}
                           </button>
                           {hasPdf && (
-                            <button
-                              onClick={() => handleReRedact(o)}
-                              className="text-[12px] font-medium text-muted bg-white border border-gray-200 rounded-full px-4 py-1.5 hover:bg-background transition-colors"
-                            >
-                              Re-redact
-                            </button>
+                            confirmReRedact === o.id ? (
+                              <span className="flex items-center gap-2 text-[12px]">
+                                <span className="text-amber-700">Resets all boxes.</span>
+                                <button
+                                  onClick={() => handleReRedact(o)}
+                                  className="font-medium text-red-600 hover:text-red-800 underline"
+                                >
+                                  Confirm
+                                </button>
+                                <button
+                                  onClick={() => setConfirmReRedact(null)}
+                                  className="text-muted hover:text-foreground"
+                                >
+                                  Cancel
+                                </button>
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => setConfirmReRedact(o.id)}
+                                className="text-[12px] font-medium text-muted bg-white border border-gray-200 rounded-lg px-4 py-1.5 hover:bg-background transition-colors"
+                              >
+                                Re-redact
+                              </button>
+                            )
                           )}
                         </div>
 
@@ -384,7 +424,7 @@ export function WFDOList({ orders }: { orders: WFDOOrder[] }) {
                           <button
                             onClick={() => handleMarkSent(o)}
                             disabled={markingId === o.id}
-                            className="text-[12px] font-medium text-white bg-green-600 rounded-full px-5 py-1.5 hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ml-auto"
+                            className="text-[12px] font-medium text-white bg-green-600 rounded-lg px-5 py-1.5 hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ml-auto"
                           >
                             {markingId === o.id ? 'Saving…' : 'Mark as Sent'}
                           </button>
@@ -424,7 +464,7 @@ export function WFDOList({ orders }: { orders: WFDOOrder[] }) {
                       <button
                         onClick={() => handleResync(o.id)}
                         disabled={resyncingId === o.id}
-                        className="text-[12px] font-medium text-blue-700 bg-blue-50 border border-blue-100 rounded-full px-4 py-1.5 hover:bg-blue-100 transition-colors disabled:opacity-50"
+                        className="text-[12px] font-medium text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-3 py-1.5 hover:bg-blue-100 transition-colors disabled:opacity-50"
                       >
                         {resyncingId === o.id ? 'Syncing…' : 'Re-sync to Sheets'}
                       </button>

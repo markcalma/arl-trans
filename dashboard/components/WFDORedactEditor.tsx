@@ -34,6 +34,7 @@ export function WFDORedactEditor({
   const [applying, setApplying] = useState(false)
   const [appliedTs, setAppliedTs] = useState<number | null>(null)
   const [resetting, setResetting] = useState(false)
+  const [resetError, setResetError] = useState<string | null>(null)
   const [showLogoStamper, setShowLogoStamper] = useState(false)
 
   const imgRef = useRef<HTMLImageElement>(null)
@@ -132,11 +133,12 @@ export function WFDORedactEditor({
 
   async function handleReset() {
     setResetting(true)
+    setResetError(null)
     try {
       const res = await fetch(`/api/wfdo-reset-pdf/${encodeURIComponent(orderId)}`, { method: 'POST' })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        alert(data.error ?? 'Reset failed')
+        setResetError(data.error ?? 'Reset failed')
         return
       }
       setAppliedTs(null)
@@ -166,20 +168,23 @@ export function WFDORedactEditor({
         <div className="flex items-center gap-3 flex-wrap">
           <button
             onClick={() => { setAppliedTs(null); onReset?.() }}
-            className="text-xs text-gray-400 hover:text-gray-600 underline"
+            className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
           >
             Draw more boxes
           </button>
           <button
             onClick={handleReset}
             disabled={resetting}
-            className="text-xs text-red-500 hover:text-red-700 underline disabled:opacity-50"
+            className="text-xs text-red-500 hover:text-red-700 transition-colors disabled:opacity-50"
           >
             {resetting ? 'Resetting…' : 'Reset to original PDF'}
           </button>
+          {resetError && (
+            <span className="text-xs text-red-600">{resetError}</span>
+          )}
           <button
             onClick={() => setShowLogoStamper(prev => !prev)}
-            className="text-xs font-medium text-blue-700 bg-blue-50 border border-blue-100 rounded-full px-3 py-1 hover:bg-blue-100 transition-colors ml-auto"
+            className="text-xs font-medium text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-3 py-1.5 hover:bg-blue-100 transition-colors ml-auto"
           >
             {showLogoStamper ? 'Hide logo tool' : 'Place ARL-Trans logo →'}
           </button>
@@ -227,21 +232,21 @@ export function WFDORedactEditor({
         <button
           onClick={() => setBoxes((prev) => prev.slice(0, -1))}
           disabled={boxes.length === 0}
-          className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-full px-3 py-1.5 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Undo
         </button>
         <button
           onClick={() => setBoxes([])}
           disabled={boxes.length === 0}
-          className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-full px-3 py-1.5 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Clear All
         </button>
         <button
           onClick={handleApply}
           disabled={boxes.length === 0 || applying}
-          className="text-xs font-medium text-white bg-blue-600 rounded-full px-4 py-1.5 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="text-xs font-medium text-white bg-blue-600 rounded-lg px-4 py-1.5 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {applying
             ? 'Applying…'

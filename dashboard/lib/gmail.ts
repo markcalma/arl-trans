@@ -167,7 +167,7 @@ function extractBodyText(payload: MessagePart): string {
   }
 
   walk(payload)
-  return parts.join('\n').slice(0, 1000)
+  return parts.join('\n')
 }
 
 async function extractAttachments(
@@ -396,6 +396,65 @@ export async function pollETAUpdateEmails(force = false): Promise<GmailMessage[]
     await gmail.users.messages.modify({
       userId: 'me',
       id: msg.id,
+      requestBody: { removeLabelIds: ['UNREAD'] },
+    })
+  }
+
+  return results
+}
+
+// ---------------------------------------------------------------------------
+// Poll for Team Three daily schedule emails (Stockton / Exton updated schedules).
+// These arrive as plain-text emails with NO attachment from weareacr.com.
+// Subject pattern: "[Location] Updated Schedule M/D"
+// ---------------------------------------------------------------------------
+export async function pollTeamThreeEmails(force = false): Promise<GmailMessage[]> {
+  const auth = getAuthClient()
+  const gmail = google.gmail({ version: 'v1', auth })
+
+  const q = force
+    ? 'newer_than:90d -category:promotions -category:social'
+    : 'is:unread newer_than:90d -category:promotions -category:social'
+  const listRes = await gmail.users.messages.list({ userId: 'me', q, maxResults: 50 })
+  const messages = listRes.data.messages ?? []
+  if (messages.length === 0) return []
+
+  const results: GmailMessage[] = []
+
+  for (const msg of messages) {
+    if (!msg.id) continue
+    if (isGmailSkipped(msg.id, 'team3')) continue
+
+    const meta = await gmail.users.messages.get({
+      userId: 'me', id: msg.id, format: 'metadata',
+      metadataHeaders: ['Subject', 'From', 'Date'],
+    })
+    const metaHeaders = meta.data.payload?.headers ?? []
+    const subject = metaHeaders.find((h) => h.name?.toLowerCase() === 'subject')?.value ?? ''
+    const from = metaHeaders.find((h) => h.name?.toLowerCase() === 'from')?.value ?? ''
+    const dateHeader = metaHeaders.find((h) => h.name?.toLowerCase() === 'date')?.value ?? ''
+    const receivedAt = dateHeader ? new Date(dateHeader).toISOString() : new Date().toISOString()
+
+    // Detect: subject must mention Stockton/Exton + Updated Schedule
+    const isSchedule = /updated schedule/i.test(subject) &&
+      /(stockton|exton)/i.test(subject)
+    if (!isSchedule) {
+      markGmailSkipped(msg.id, 'team3')
+      continue
+    }
+
+    console.log(`[gmail/team3] Schedule detected: "${subject}" from ${from}`)
+
+    const full = await gmail.users.messages.get({ userId: 'me', id: msg.id, format: 'full' })
+    const payload = full.data.payload
+    if (!payload) continue
+
+    const bodyText = extractBodyText(payload)
+
+    results.push({ gmailId: msg.id, sender: from, subject, body: bodyText, attachments: [], receivedAt })
+
+    await gmail.users.messages.modify({
+      userId: 'me', id: msg.id,
       requestBody: { removeLabelIds: ['UNREAD'] },
     })
   }

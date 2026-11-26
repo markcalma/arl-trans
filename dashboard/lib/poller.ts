@@ -1,7 +1,7 @@
-import { pollNewDOs, pollWaterReportEmails, pollETAUpdateEmails } from './gmail'
+import { pollNewDOs, pollWaterReportEmails, pollETAUpdateEmails, pollTeamThreeEmails } from './gmail'
 import { parseAllDOsFromPdf, parseETAUpdateEmail } from './claude'
 import { insertDOOrder, gmailIdExists, insertWF1Batch, wf1GmailIdExists, etaUpdateGmailIdExists, insertETAUpdate } from './db'
-import { parseWaterReportExcel, parseWaterReportText } from './wf1-parser'
+import { parseWaterReportExcel, parseWaterReportText, parseTeamThreeSchedule } from './wf1-parser'
 import { parseUSFDeliveryOrderExcel } from './excel-do-parser'
 import { updateWFDOStatus, updateWF1Status, updateETAStatus } from './poller-status'
 import { updateContainerETA } from './sheets'
@@ -18,13 +18,15 @@ export function startPoller(): void {
   if (pollerStarted) return
   pollerStarted = true
 
-  console.log('[poller] Started — checking Gmail every 60s (WF-DO + WF1 + ETA)')
+  console.log('[poller] Started — checking Gmail every 60s (WF-DO + WF1 + ETA + Team3)')
   runDoPoll()
   runWF1Poll()
   runETAUpdatePoll()
+  runTeamThreePoll()
   setInterval(runDoPoll, POLL_INTERVAL_MS)
   setInterval(runWF1Poll, POLL_INTERVAL_MS)
   setInterval(runETAUpdatePoll, POLL_INTERVAL_MS)
+  setInterval(runTeamThreePoll, POLL_INTERVAL_MS)
 }
 
 export async function runDoPoll(force = false): Promise<{ ingested: number; error: string | null }> {
@@ -258,6 +260,49 @@ export async function runWF1Poll(force = false): Promise<{ ingested: number; err
     const error = String(err)
     console.error('[poller/wf1] Error during WF1 poll:', err)
     updateWF1Status(0, error)
+    return { ingested: 0, error }
+  }
+}
+
+export async function runTeamThreePoll(force = false): Promise<{ ingested: number; error: string | null }> {
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+    return { ingested: 0, error: null }
+  }
+  const tokensPath = path.join(process.cwd(), 'data', 'google-tokens.json')
+  if (!fs.existsSync(tokensPath)) return { ingested: 0, error: null }
+
+  let ingested = 0
+  try {
+    const messages = await pollTeamThreeEmails(force)
+    if (messages.length === 0) return { ingested: 0, error: null }
+    console.log(`[poller/team3] Found ${messages.length} Team Three schedule email(s)`)
+
+    for (const msg of messages) {
+      if (wf1GmailIdExists(msg.gmailId)) continue
+
+      const containers = parseTeamThreeSchedule(msg.body, msg.subject)
+      if (containers.length === 0) {
+        console.log(`[poller/team3] No containers parsed from "${msg.subject}" — skipping`)
+        continue
+      }
+
+      insertWF1Batch({
+        id: randomUUID(),
+        status: 'pending_review',
+        receivedAt: msg.receivedAt,
+        sender: msg.sender,
+        subject: msg.subject,
+        gmailId: msg.gmailId,
+        sourceFormat: 'team3',
+        containers,
+      })
+      console.log(`[poller/team3] Stored ${containers.length} containers from "${msg.subject}"`)
+      ingested++
+    }
+    return { ingested, error: null }
+  } catch (err) {
+    const error = String(err)
+    console.error('[poller/team3] Error during Team Three poll:', err)
     return { ingested: 0, error }
   }
 }

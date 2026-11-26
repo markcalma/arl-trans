@@ -397,8 +397,32 @@ fuser -k 8000/tcp
 pm2 restart arl-redact
 ```
 
+**What was done (session 14 — 2026-11-26, Team Three + MCL fix):**
+- **Team demo call findings** (Gary Englade, Lorene, Greg Clarke): Water report feeds Load Board ONLY (not MCL); Team Three daily schedule emails are separate from ACR water report; single work orders (Page & Jones, Taggart) don't go on Load Board; MCL only updated when DO arrives
+- **`lib/types.ts`**: Added `'team3'` to `sourceFormat` union in `WF1Batch`
+- **`lib/wf1-parser.ts`**: Added `parseTeamThreeSchedule(body, subject)` — container-number-anchored parser (ISO 6346 `^[A-Z]{4}\d{7}$`); extracts ETA from line before container, PO from 3 lines before, SSL by scanning up to 6 lines after for 2–5 uppercase code; destination from subject (EXTON/STOCKTON); freeDays hardcoded to 10 (Gary confirmed all Team Three = 10 days)
+- **`lib/gmail.ts`**: Removed 1000-char truncation from `extractBodyText` (Team Three bodies need full content). Added `pollTeamThreeEmails()` — detects by subject `/updated schedule/i` + `/(stockton|exton)/i`, fetches plain text body, marks read, skips non-matches via `markGmailSkipped`
+- **`lib/db.ts`**: Extended `markGmailSkipped`/`isGmailSkipped` workflow union to include `'team3'`
+- **`lib/poller.ts`**: Added `runTeamThreePoll()` — polls Team Three emails, parses with `parseTeamThreeSchedule`, stores as `sourceFormat: 'team3'` batches; wired into `startPoller()` with its own `setInterval`
+- **`app/api/wf1-approve/[id]/route.ts`**: Team Three batches skip MCL write (Load Board only). WF1 Amercare/ACR batches continue writing to both sheets.
+- **`app/api/wf1-resync/[id]/route.ts`**: Same MCL skip for team3 sourceFormat
+- TypeScript: 0 errors | Next.js build: clean
+
+**Key decisions (session 14):**
+- **Team Three → Load Board only** — MCL is only updated when the actual DO arrives via WF-DO. Team Three schedule is an advance notice, not the source of truth for MCL.
+- **10 days free for all Team Three** — Gary confirmed all Team Three loads use 10 days, hardcoded in parser.
+- **Subject-line destination routing** — "Stockton Updated Schedule" → STOCKTON tab, "Exton Updated Schedule" → EXTON tab.
+- **Container-anchored parsing** — Email records are 11 fields but senders sometimes omit trailing blank lines. Anchoring on ISO 6346 container # lines is more robust than strict 11-line chunking.
+
+**Parallel test plan (Nov 28, 2026):**
+- Gary sends Saturday water report by 12pm Central
+- Mark and Greg compare Stockton/Exton Load Board tabs line-by-line against Gary's manual version
+- Also run DO flow to verify MCL updates correctly
+
 **Next session:**
-- Complete screen recording for team demo — send test emails, do NOT open them in Gmail, wait 60s for dashboard to pick them up
-- Add Nginx + SSL for a clean domain once team confirms VPS is working
+- Deploy session 14 build to VPS: `cd /opt/arl-trans && git pull && cd dashboard && npm run build && pm2 restart arl-dashboard`
+- Update VPS Google Sheet IDs if Gary shared copy Sheet URLs — update `GOOGLE_SHEET_ID_LOADBOARD` and `GOOGLE_SHEET_ID_MASTER` in `/opt/arl-trans/dashboard/.env.local`
+- Saturday Nov 28 parallel test with Gary — compare Sheets output vs manual
+- Add Nginx + SSL once team confirms VPS is stable
 - Set up ops@arl-trans.com shared Gmail inbox when IT confirms
 - WF2/WF3 when PortPro API access arrives

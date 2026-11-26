@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import fs from 'fs'
 import path from 'path'
-import { getDOOrder } from '@/lib/db'
+import { getDOOrder, updateDORedactedAt } from '@/lib/db'
 
 export async function POST(
   req: NextRequest,
@@ -36,6 +36,7 @@ export async function POST(
 
   const resultBytes = Buffer.from(await res.arrayBuffer())
   fs.writeFileSync(filePath, resultBytes)
+  updateDORedactedAt(safeId)
 
   return NextResponse.json({ ok: true })
 }

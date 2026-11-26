@@ -69,6 +69,8 @@ function migrate(db: Database.Database): void {
   `)
   // Add customer column to existing DBs that predate this migration
   try { db.exec(`ALTER TABLE delivery_orders ADD COLUMN customer TEXT NOT NULL DEFAULT ''`) } catch { /* already exists */ }
+  // Add redacted_at column to existing DBs that predate this migration
+  try { db.exec(`ALTER TABLE delivery_orders ADD COLUMN redacted_at TEXT`) } catch { /* already exists */ }
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS eta_updates (
@@ -118,6 +120,7 @@ function rowToOrder(row: Record<string, unknown>): WFDOOrder {
     packingListAttached: Boolean(row.packing_list_attached),
     processedAt: row.processed_at as string,
     sentAt: (row.sent_at as string) ?? undefined,
+    redactedAt: (row.redacted_at as string) ?? undefined,
   }
 }
 
@@ -194,6 +197,11 @@ export function getDOOrder(id: string): WFDOOrder | undefined {
   const db = getDb()
   const row = db.prepare('SELECT * FROM delivery_orders WHERE id = ?').get(id) as Record<string, unknown> | undefined
   return row ? rowToOrder(row) : undefined
+}
+
+export function updateDORedactedAt(id: string): void {
+  const db = getDb()
+  db.prepare('UPDATE delivery_orders SET redacted_at = ? WHERE id = ?').run(new Date().toISOString(), id)
 }
 
 export function getAllDOOrders(): WFDOOrder[] {
@@ -304,12 +312,12 @@ export function wf1GmailIdExists(gmailId: string): boolean {
 // ETA Updates
 // ---------------------------------------------------------------------------
 
-export function markGmailSkipped(gmailId: string, workflow: 'wfdo' | 'wf1' | 'eta'): void {
+export function markGmailSkipped(gmailId: string, workflow: 'wfdo' | 'wf1' | 'eta' | 'team3'): void {
   const db = getDb()
   db.prepare('INSERT OR IGNORE INTO skipped_gmail_ids (gmail_id, workflow, skipped_at) VALUES (?, ?, ?)').run(gmailId, workflow, new Date().toISOString())
 }
 
-export function isGmailSkipped(gmailId: string, workflow: 'wfdo' | 'wf1' | 'eta'): boolean {
+export function isGmailSkipped(gmailId: string, workflow: 'wfdo' | 'wf1' | 'eta' | 'team3'): boolean {
   const db = getDb()
   return Boolean(db.prepare('SELECT 1 FROM skipped_gmail_ids WHERE gmail_id = ? AND workflow = ?').get(gmailId, workflow))
 }

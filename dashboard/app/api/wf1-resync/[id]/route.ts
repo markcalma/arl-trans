@@ -11,10 +11,11 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   }
 
   const now = new Date().toISOString()
+  const isTeamThree = batch.sourceFormat === 'team3'
 
   const [lbResult, mlResult] = await Promise.allSettled([
     upsertWF1ContainersToLoadBoard(batch.containers),
-    upsertWF1ContainersToMasterList(batch.containers),
+    isTeamThree ? Promise.resolve({ written: 0, updated: 0, errors: [], tabs: {} }) : upsertWF1ContainersToMasterList(batch.containers),
   ])
 
   const lbData = lbResult.status === 'fulfilled' ? lbResult.value : { written: 0, updated: 0, errors: [String((lbResult as PromiseRejectedResult).reason)], tabs: {} }

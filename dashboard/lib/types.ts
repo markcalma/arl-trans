@@ -134,6 +134,7 @@ export interface WFDOOrder {
   packingListAttached: boolean
   processedAt: string
   sentAt?: string
+  redactedAt?: string
 }
 
 export interface WFDODay {
@@ -167,7 +168,7 @@ export interface WF1Batch {
   sender: string
   subject: string
   gmailId?: string
-  sourceFormat: 'excel' | 'text'
+  sourceFormat: 'excel' | 'text' | 'team3'
   containers: WF1Container[]
   containerCount: number
   reviewedAt?: string
